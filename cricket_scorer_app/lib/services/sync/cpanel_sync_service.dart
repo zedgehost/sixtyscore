@@ -15,10 +15,20 @@ class CpanelSyncService {
   final Store store;
   final CpanelApiClient apiClient;
   bool _isSyncing = false;
+  static Timer? _debounceTimer;
 
   CpanelSyncService({required this.store, required this.apiClient});
 
   bool get isSyncing => _isSyncing;
+
+  /// Fire-and-forget background sync with 3-second debounce.
+  /// Never blocks the UI thread, never lags scoring, completely safe offline.
+  void triggerAutoSync() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(seconds: 3), () {
+      syncNow();
+    });
+  }
 
   Map<String, dynamic> _careerStatsToJson(CareerStats s) => {
         'matches': s.matches,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,8 @@ import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
 import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/models/models.dart';
 import 'package:cricket_scorer_app/services/auth/user_code.dart';
+import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
+import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
 import 'package:cricket_scorer_app/services/io/player_io.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/core/theme/theme.dart';
@@ -235,6 +238,13 @@ class _TeamsScreenState extends State<TeamsScreen> {
       } else {
         existing.name = name;
         await store.persistTeamsOnly();
+      unawaited(() async {
+        try {
+          final client = CpanelApiClient();
+          await client.init();
+          CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+        } catch (_) {}
+      }());
       }
     }
   }
@@ -324,6 +334,13 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                 }
               }
               await store.persistTeamsOnly();
+      unawaited(() async {
+        try {
+          final client = CpanelApiClient();
+          await client.init();
+          CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+        } catch (_) {}
+      }());
               setState(() {});
             },
           ),
@@ -352,6 +369,13 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
               if (name != null && name.isNotEmpty) {
                 setState(() => team.name = name);
                 await store.persistTeamsOnly();
+      unawaited(() async {
+        try {
+          final client = CpanelApiClient();
+          await client.init();
+          CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+        } catch (_) {}
+      }());
               }
             },
           ),
@@ -698,6 +722,13 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                               if (confirm != true) return;
                               setState(() => team.players.removeAt(i));
                               await store.persistTeamsOnly();
+      unawaited(() async {
+        try {
+          final client = CpanelApiClient();
+          await client.init();
+          CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+        } catch (_) {}
+      }());
                             },
                           ),
                         ],
@@ -855,6 +886,13 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                                   }
                                   team.players.add(r.toTeamPlayer());
                                   await store.persistTeamsOnly();
+      unawaited(() async {
+        try {
+          final client = CpanelApiClient();
+          await client.init();
+          CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+        } catch (_) {}
+      }());
                                   if (ctx.mounted) Navigator.pop(ctx);
                                   if (context.mounted) {
                                     setState(() {});
@@ -1070,6 +1108,13 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
       if (existing == null) team.players.add(p);
       setState(() {});
       await store.persistTeamsOnly();
+      unawaited(() async {
+        try {
+          final client = CpanelApiClient();
+          await client.init();
+          CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+        } catch (_) {}
+      }());
     }
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:cricket_scorer_app/models/models.dart';
@@ -6,6 +7,8 @@ import 'package:cricket_scorer_app/services/auth/user_code.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
 import 'package:cricket_scorer_app/views/screens/scoring/scoring_screen.dart';
+import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
+import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
 
 class MatchLineupsScreen extends StatefulWidget {
   final Store store;
@@ -145,6 +148,15 @@ class _MatchLineupsScreenState extends State<MatchLineupsScreen> {
 
       final m = draft.toMatch();
       await store.upsertMatch(m);
+
+      // Instantly start syncing new match in background
+      unawaited(() async {
+        try {
+          final client = CpanelApiClient();
+          await client.init();
+          CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+        } catch (_) {}
+      }());
 
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(

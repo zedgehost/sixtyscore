@@ -20,6 +20,8 @@ import 'package:cricket_scorer_app/views/widgets/charts.dart';
 import 'package:cricket_scorer_app/views/widgets/potm_picker.dart';
 import 'package:cricket_scorer_app/views/screens/scorecard/scorecard_screen.dart';
 import 'package:cricket_scorer_app/views/screens/scoring/super_over_screen.dart';
+import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
+import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
 
 class ScoringScreen extends StatefulWidget {
   final Store store;
@@ -133,6 +135,15 @@ class _ScoringScreenState extends State<ScoringScreen> {
         }
       }
       await _runPlayoffUpdate();
+
+      // Non-blocking auto sync on scoring events (debounced 3s, zero UI lag, offline safe)
+      unawaited(() async {
+        try {
+          final client = CpanelApiClient();
+          await client.init();
+          CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+        } catch (_) {}
+      }());
     } catch (e, st) {
       // Silent-close guard: _afterChange runs inside _record,
       // which every ball button calls WITHOUT await — a throw
@@ -1966,6 +1977,16 @@ class _ScoringScreenState extends State<ScoringScreen> {
                   }
                   match.status = 'completed';
                   await store.persistMatchesOnly();
+
+                  // Non-blocking background sync to cPanel / live feed
+                  unawaited(() async {
+                    try {
+                      final client = CpanelApiClient();
+                      await client.init();
+                      CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+                    } catch (_) {}
+                  }());
+
                   nav.pushReplacement(
                     MaterialPageRoute(
                       builder: (_) =>
