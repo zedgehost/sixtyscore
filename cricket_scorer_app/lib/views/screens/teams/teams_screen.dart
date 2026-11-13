@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
 import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/auth/user_code.dart';
 import 'package:cricket_scorer_app/services/io/player_io.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/core/theme/theme.dart';
@@ -783,9 +784,17 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           final q = query.trim().toLowerCase();
+          final cleanQ = q.replaceAll('-', '').replaceAll(' ', '');
           final list = store.regPlayers.where((r) {
             if (q.isEmpty) return true;
-            return r.name.toLowerCase().contains(q) ||
+            final name = r.name.toLowerCase();
+            final id = r.id.toLowerCase();
+            final code = userCodeForUid(r.id).toLowerCase();
+            final cleanCode = code.replaceAll('-', '').replaceAll(' ', '');
+            return name.contains(q) ||
+                id.contains(q) ||
+                code.contains(q) ||
+                cleanCode.contains(cleanQ) ||
                 (r.jerseyNo > 0 && '${r.jerseyNo}'.contains(q));
           }).toList();
           return AlertDialog(

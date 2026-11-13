@@ -497,16 +497,22 @@ class _HomeScreenState extends State<HomeScreen>
           t.id.toLowerCase().contains(query);
     }).toList();
 
-    // 3. Players (from regPlayers and all team squads)
+    // 3. Players (from regPlayers, all team squads, and match participants)
     final seenPlayerIds = <String>{};
     final matchedPlayers = <Player>[];
+    final cleanQuery = query.replaceAll('-', '').replaceAll(' ', '');
 
     for (final reg in store.regPlayers) {
       if (seenPlayerIds.add(reg.id)) {
-        final code = userCodeForUid(reg.id);
-        if (reg.name.toLowerCase().contains(query) ||
-            code.toLowerCase().contains(query) ||
-            reg.id.toLowerCase().contains(query)) {
+        final code = userCodeForUid(reg.id).toLowerCase();
+        final cleanCode = code.replaceAll('-', '').replaceAll(' ', '');
+        final id = reg.id.toLowerCase();
+        final name = reg.name.toLowerCase();
+        if (name.contains(query) ||
+            code.contains(query) ||
+            cleanCode.contains(cleanQuery) ||
+            id.contains(query) ||
+            (reg.jerseyNo > 0 && '${reg.jerseyNo}' == query)) {
           matchedPlayers.add(reg.toTeamPlayer());
         }
       }
@@ -514,11 +520,44 @@ class _HomeScreenState extends State<HomeScreen>
     for (final t in store.teams) {
       for (final p in t.players) {
         if (seenPlayerIds.add(p.id)) {
-          final code = p.userCode ?? userCodeForUid(p.id);
-          if (p.name.toLowerCase().contains(query) ||
-              code.toLowerCase().contains(query) ||
-              p.id.toLowerCase().contains(query)) {
+          final code = (p.userCode ?? userCodeForUid(p.id)).toLowerCase();
+          final cleanCode = code.replaceAll('-', '').replaceAll(' ', '');
+          final id = p.id.toLowerCase();
+          final name = p.name.toLowerCase();
+          if (name.contains(query) ||
+              code.contains(query) ||
+              cleanCode.contains(cleanQuery) ||
+              id.contains(query) ||
+              (p.jerseyNo > 0 && '${p.jerseyNo}' == query)) {
             matchedPlayers.add(p);
+          }
+        }
+      }
+    }
+    // Also include any player who participated in recorded matches
+    for (final m in store.matches) {
+      final allPids = {...m.xiA, ...m.xiB};
+      for (final inn in m.innings) {
+        allPids.addAll(inn.batting.keys);
+        allPids.addAll(inn.bowling.keys);
+      }
+      for (final pid in allPids) {
+        if (seenPlayerIds.add(pid)) {
+          final pName = store.playerName(pid).toLowerCase();
+          final code = userCodeForUid(pid).toLowerCase();
+          final cleanCode = code.replaceAll('-', '').replaceAll(' ', '');
+          final id = pid.toLowerCase();
+          if (pName.contains(query) ||
+              code.contains(query) ||
+              cleanCode.contains(cleanQuery) ||
+              id.contains(query)) {
+            matchedPlayers.add(store.findPlayer(pid) ??
+                Player(
+                  id: pid,
+                  name: store.playerName(pid),
+                  jerseyNo: 0,
+                  userCode: userCodeForUid(pid),
+                ));
           }
         }
       }

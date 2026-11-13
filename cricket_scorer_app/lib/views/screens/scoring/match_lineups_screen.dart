@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/auth/user_code.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
 import 'package:cricket_scorer_app/views/screens/scoring/scoring_screen.dart';
@@ -649,12 +650,20 @@ class _MatchLineupsScreenState extends State<MatchLineupsScreen> {
                       onChanged: (val) {
                         setDState(() {
                           final query = val.toLowerCase().trim();
+                          final cleanQuery = query.replaceAll('-', '').replaceAll(' ', '');
                           if (query.isEmpty) {
                             filtered = List.from(pool);
                           } else {
                             filtered = pool.where((p) {
-                              return p.name.toLowerCase().contains(query) ||
-                                  p.id.toLowerCase().contains(query);
+                              final name = p.name.toLowerCase();
+                              final id = p.id.toLowerCase();
+                              final code = (p.userCode ?? userCodeForUid(p.id)).toLowerCase();
+                              final cleanCode = code.replaceAll('-', '').replaceAll(' ', '');
+                              return name.contains(query) ||
+                                  id.contains(query) ||
+                                  code.contains(query) ||
+                                  cleanCode.contains(cleanQuery) ||
+                                  (p.jerseyNo > 0 && '${p.jerseyNo}' == query);
                             }).toList();
                           }
                         });
