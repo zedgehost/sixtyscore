@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/nrr_calculator.dart';
-import 'package:cricket_scorer_app/scoring.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/domain/nrr/nrr_calculator.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 
 // Teams: tx = the team, tr = the rival to overtake, tt = third team
 // (the hypothetical opponent — its results only shape the base table).

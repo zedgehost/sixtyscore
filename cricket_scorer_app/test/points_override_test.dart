@@ -6,9 +6,9 @@
 // tournament JSON without the field must still load.
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/scoring.dart';
-import 'package:cricket_scorer_app/tournament_engine.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
+import 'package:cricket_scorer_app/domain/tournament/tournament_engine.dart';
 
 List<String> xi(String p) => [for (var i = 1; i <= 11; i++) '$p$i'];
 

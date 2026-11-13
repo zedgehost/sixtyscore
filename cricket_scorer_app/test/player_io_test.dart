@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/player_io.dart';
+import 'package:cricket_scorer_app/services/io/player_io.dart';
 
 void main() {
   group('CSV import/export', () {

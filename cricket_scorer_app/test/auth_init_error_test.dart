@@ -3,7 +3,7 @@
 // threw on the device, AuthService.init() swallowed the exception, and every
 // login tap was guard-blocked with the generic "not set up yet" banner.
 // Now init() keeps the reason and _guard() surfaces it.
-import 'package:cricket_scorer_app/auth_service.dart';
+import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

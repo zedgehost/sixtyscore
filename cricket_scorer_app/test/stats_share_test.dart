@@ -1,9 +1,9 @@
 // v1.1.7: Top-5 share-stats categories — real data only, no fabricated rows.
 // Pure in-memory logic; no SharedPreferences I/O.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/stats_share.dart';
-import 'package:cricket_scorer_app/store.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/share/stats_share.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
 
 Store _store() => Store();
 

@@ -9,10 +9,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/screens/stats_screen.dart';
-import 'package:cricket_scorer_app/store.dart';
-import 'package:cricket_scorer_app/theme.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/views/screens/teams/stats_screen.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
+import 'package:cricket_scorer_app/core/theme/theme.dart';
 
 Store _storeWithData({bool withOverride = false}) {
   SharedPreferences.setMockInitialValues({});

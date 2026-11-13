@@ -1,6 +1,6 @@
 // Pure TTS phrase-builder tests (no TTS engine involved).
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/tts_service.dart';
+import 'package:cricket_scorer_app/services/audio/tts_service.dart';
 
 void main() {
   group('ttsOverSummary', () {

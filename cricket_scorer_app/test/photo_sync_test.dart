@@ -6,7 +6,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
-import 'package:cricket_scorer_app/photo_sync.dart';
+import 'package:cricket_scorer_app/services/sync/photo_sync.dart';
 
 Uint8List _testJpeg(int w, int h) {
   final image = img.Image(width: w, height: h);

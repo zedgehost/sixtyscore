@@ -1,0 +1,10 @@
+QA run 2026-11-09T05-06-06-412Z-a2500136
+Project: 60score
+Budget: 240000 ms
+RUN flutter-analyze
+UNVERIFIED flutter-analyze: The command completed, but exit status alone does not establish a test result. Configure a supported reporter.
+RUN tournament-deep-flow-tests
+UNVERIFIED tournament-deep-flow-tests: The command completed, but exit status alone does not establish a test result. Configure a supported reporter.
+RUN responsive-360dp-ui-fit
+UNVERIFIED responsive-360dp-ui-fit: The command completed, but exit status alone does not establish a test result. Configure a supported reporter.
+RESULT INCOMPLETE: 0/3 checks passed, 0 tests observed

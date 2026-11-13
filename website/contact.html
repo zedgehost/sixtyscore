@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Support & Contact — 60Score</title>
+  <meta name="description" content="Get support, report bugs, or ask questions about 60Score Cricket Scorer app.">
+  <link rel="icon" type="image/png" href="assets/images/app_icon.png">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="container">
+      <nav class="navbar">
+        <a href="index.html" class="brand">
+          <img src="assets/images/app_icon.png" alt="60Score Logo">
+          <div class="brand-text">60<span>Score</span></div>
+        </a>
+        <ul class="nav-links">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="privacy-policy.html">Privacy Policy</a></li>
+          <li><a href="terms-of-service.html">Terms</a></li>
+          <li><a href="data-deletion.html">Data Deletion</a></li>
+          <li><a href="contact.html" class="active">Contact</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="container">
+      <h1>Support & Contact Us</h1>
+      <p>Have a question or found a bug? We're here to help.</p>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content-wrapper">
+    <div class="legal-card">
+
+      <h2>Get in Touch</h2>
+      <p>
+        Whether you are organizing a premier club championship or scoring a weekend turf match, our team is committed to giving you the most dependable cricket scoring experience.
+      </p>
+
+      <form style="margin: 24px 0 36px;" onsubmit="event.preventDefault(); document.getElementById('contact-success').style.display='block';">
+        <div class="form-group">
+          <label for="c-name">Full Name</label>
+          <input type="text" id="c-name" placeholder="Your name" required>
+        </div>
+
+        <div class="form-group">
+          <label for="c-email">Email Address</label>
+          <input type="email" id="c-email" placeholder="your.email@example.com" required>
+        </div>
+
+        <div class="form-group">
+          <label for="c-category">Category</label>
+          <select id="c-category">
+            <option value="bug">Bug Report / Scoring Glitch</option>
+            <option value="feature">Feature Request / Suggestion</option>
+            <option value="tournament">Tournament & League Setup Help</option>
+            <option value="account">Account & Data Question</option>
+            <option value="other">General Inquiry</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="c-msg">Message</label>
+          <textarea id="c-msg" rows="5" placeholder="Describe your question or issue in detail..." required></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+          Send Message
+        </button>
+
+        <div id="contact-success" style="display: none; margin-top: 20px;" class="alert-box">
+          <strong>Thank You:</strong> Your message has been dispatched. Our developer support team usually responds within 24 hours.
+        </div>
+      </form>
+
+      <h2>Direct Developer Contact</h2>
+      <p>You can also reach our engineering and support leads directly:</p>
+      <ul>
+        <li><strong>Support Email:</strong> <a href="mailto:support@60score.com">support@60score.com</a></li>
+        <li><strong>Developer:</strong> Sharjeel (Lahore, Pakistan)</li>
+        <li><strong>Response Time:</strong> Typically within 24 business hours.</li>
+      </ul>
+
+      <h2 id="faq" style="margin-top: 40px;">Frequently Asked Questions (FAQs)</h2>
+
+      <h3>1. Can I score matches completely without internet?</h3>
+      <p>
+        Yes! 60Score is built with an offline-first architecture. All match events, bowler spells, fall of wickets, and tournament calculations are stored safely on your device storage. You can score anywhere, even on remote grounds with zero cell reception.
+      </p>
+
+      <h3>2. How does the DLS Target calculation work?</h3>
+      <p>
+        60Score embeds the official ICC Duckworth-Lewis-Stern algorithm for limited-overs matches. If rain interrupts play, simply revise the overs allocated to the chasing team, and 60Score immediately calculates the exact revised target score, par scores, and compliant Net Run Rate (ICC Clause 16.10.2).
+      </p>
+
+      <h3>3. What if a bowler gets injured mid-over?</h3>
+      <p>
+        Under MCC Law 17.8, another bowler is allowed to complete the remaining balls of that over. 60Score provides an explicit <em>"Replace Bowler (Injury)"</em> action directly from the scoring menu so you can substitute the bowler without corrupting any statistics.
+      </p>
+
+      <h3>4. How do I start a Player Auction / Draft?</h3>
+      <p>
+        Navigate to the Tournament section, tap on <strong>Player Draft</strong>, configure your team purse budgets and bidding tiers (Platinum, Gold, Silver), and start bidding in real-time with automated squad roster updates.
+      </p>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <h3>60<span>Score</span></h3>
+          <p>Professional offline-first cricket scorer, player auction, and tournament management app.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Legal & Policies</h4>
+          <ul>
+            <li><a href="privacy-policy.html">Privacy Policy</a></li>
+            <li><a href="terms-of-service.html">Terms of Service</a></li>
+            <li><a href="data-deletion.html">Data Deletion Request</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Support</h4>
+          <ul>
+            <li><a href="contact.html">Contact Us</a></li>
+            <li><a href="contact.html#faq">Scorer FAQs</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 60Score. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

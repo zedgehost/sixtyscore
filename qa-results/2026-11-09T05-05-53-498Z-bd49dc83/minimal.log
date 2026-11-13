@@ -1,0 +1,6 @@
+QA run 2026-11-09T05-05-53-498Z-bd49dc83
+Project: 60score
+Budget: 240000 ms
+RUN flutter-analyze
+BLOCKED runner-error: spawn EINVAL
+RESULT BLOCKED: 0/1 checks passed, 0 tests observed

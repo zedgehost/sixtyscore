@@ -8,9 +8,9 @@
 // on settle, and an all-empty flush over an existing remote backup
 // is suppressed when that pull imported nothing.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/store.dart';
-import 'package:cricket_scorer_app/sync_service.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
+import 'package:cricket_scorer_app/services/sync/sync_service.dart';
 
 void main() {
   group('SyncPushGuard gate', () {

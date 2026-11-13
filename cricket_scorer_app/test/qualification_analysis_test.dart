@@ -1,6 +1,6 @@
 // Tests for the v1.4.5 qualification-chances computation (3 outcomes per
 // remaining fixture, current-NRR tiebreak, Monte Carlo beyond 100k).
-import 'package:cricket_scorer_app/qualification_analysis.dart';
+import 'package:cricket_scorer_app/domain/qualification/qualification_analysis.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 QualTeamInput _t(String id, int points, double nrr) =>

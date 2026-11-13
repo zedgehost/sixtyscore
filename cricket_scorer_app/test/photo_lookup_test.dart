@@ -2,8 +2,8 @@
 // everywhere (Registered Players, Team Management, squads, POTM, Summary,
 // fixture cards). Pure in-memory logic; no SharedPreferences I/O.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/store.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
 
 Store _store() => Store();
 

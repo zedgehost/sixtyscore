@@ -1,7 +1,7 @@
 // Tests for the free-touch wagon wheel (v4 redesign).
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/scoring.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 
 InningsState _innings() {
   final m = Match(

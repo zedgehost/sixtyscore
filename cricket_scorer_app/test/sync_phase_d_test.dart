@@ -15,8 +15,8 @@
 // chance to protect the cloud — the gate has to.
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:cricket_scorer_app/entity_sync.dart';
-import 'package:cricket_scorer_app/models.dart';
+import 'package:cricket_scorer_app/services/sync/entity_sync.dart';
+import 'package:cricket_scorer_app/models/models.dart';
 
 // ---------------- fixtures (mirroring sync_v2_test) --------------
 

@@ -22,12 +22,12 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:cricket_scorer_app/account_profile.dart';
-import 'package:cricket_scorer_app/entity_sync.dart';
-import 'package:cricket_scorer_app/entity_sync_coordinator.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/photo_sync.dart';
-import 'package:cricket_scorer_app/store.dart';
+import 'package:cricket_scorer_app/services/auth/account_profile.dart';
+import 'package:cricket_scorer_app/services/sync/entity_sync.dart';
+import 'package:cricket_scorer_app/services/sync/entity_sync_coordinator.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/sync/photo_sync.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
 
 // ---------------- fixtures -------------------------------------
 

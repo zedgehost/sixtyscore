@@ -9,8 +9,8 @@
 // fall-of-wicket scores) whenever deliveries are missing; the
 // delivery-derived numbers stay preferred when they exist.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/scoring.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 
 Match baseMatch({List<InningsState>? innings}) {
   return Match(

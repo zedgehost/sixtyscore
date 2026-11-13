@@ -10,8 +10,8 @@
 // consistent one wins before ball events are ever counted;
 // every other case falls through to the old steps unchanged.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/sync_service.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/sync/sync_service.dart';
 
 const _xiA = [
   'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11',

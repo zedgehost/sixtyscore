@@ -3,8 +3,8 @@
 // scoring screen. Defaults hold throughout: XI is 11 by default and
 // the wicket limit stays 10 — an XI edit never touches maxWickets.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/scoring.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 
 Match twoInningsMatch() {
   final m = Match(

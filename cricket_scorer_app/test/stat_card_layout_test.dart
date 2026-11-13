@@ -4,10 +4,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/screens/profile_screen.dart';
-import 'package:cricket_scorer_app/screens/tournament_stats.dart';
-import 'package:cricket_scorer_app/store.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/views/screens/teams/profile_screen.dart';
+import 'package:cricket_scorer_app/views/screens/tournament/tournament_stats.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
 
 Match _matchWithFigures() {
   final m = Match(
@@ -132,6 +132,6 @@ void main() {
     await tester.pump();
     expect(tester.takeException(), isNull);
     expect(find.text('My Profile'), findsOneWidget);
-    expect(find.text('Log in / Sign up'), findsWidgets);
+    expect(find.text('Sign in with Google'), findsWidgets);
   });
 }

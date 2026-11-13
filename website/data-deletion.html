@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Data Deletion Request — 60Score</title>
+  <meta name="description" content="Request permanent deletion of your 60Score account and associated personal data. Google Play User Data Deletion compliant.">
+  <link rel="icon" type="image/png" href="assets/images/app_icon.png">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="container">
+      <nav class="navbar">
+        <a href="index.html" class="brand">
+          <img src="assets/images/app_icon.png" alt="60Score Logo">
+          <div class="brand-text">60<span>Score</span></div>
+        </a>
+        <ul class="nav-links">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="privacy-policy.html">Privacy Policy</a></li>
+          <li><a href="terms-of-service.html">Terms</a></li>
+          <li><a href="data-deletion.html" class="active">Data Deletion</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="container">
+      <h1>Account & Data Deletion Request</h1>
+      <p>Google Play Policy & GDPR Article 17 (Right to Erasure) Compliance</p>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content-wrapper">
+    <div class="legal-card">
+
+      <div class="alert-box">
+        <strong>Google Play Compliance Notice:</strong> 60Score respects your privacy and provides full transparency. You have the unconditional right to request the permanent deletion of your account and any associated cloud data.
+      </div>
+
+      <h2>1. Overview of Data Storage</h2>
+      <p>
+        60Score is an offline-first application:
+      </p>
+      <ul>
+        <li><strong>Local Data:</strong> Match scorecards, drafts, and tournaments created without an account are stored solely on your device. You can immediately wipe all local data by going to Android <em>Settings > Apps > 60Score > Storage > Clear Data</em> or uninstalling the app.</li>
+        <li><strong>Cloud Account Data:</strong> If you created an account via Google Sign-In, Email, or Phone to sync tournaments across devices, your account records are stored securely on Firebase. You can submit a deletion request below to purge this data permanently.</li>
+      </ul>
+
+      <h2>2. What Data Is Deleted Upon Request?</h2>
+      <p>When you request data deletion, we permanently purge:</p>
+      <ul>
+        <li>Your authentication profile (User ID, Email address, Display name, and Phone number).</li>
+        <li>All cloud-synced tournaments and custom squad rosters associated with your account.</li>
+        <li>All server logs and diagnostic traces containing your device identifiers.</li>
+      </ul>
+
+      <h2>3. Data Retention Period</h2>
+      <p>
+        Upon receiving your verified request, all personal data is deleted within <strong>7 business days</strong>. No backup archives are retained beyond this processing period.
+      </p>
+
+      <h2>4. Submit a Data Deletion Request</h2>
+      <p>
+        Please fill out the form below or email us directly at <code>privacy@60score.com</code> using the email address associated with your 60Score account.
+      </p>
+
+      <form style="margin-top: 24px;" onsubmit="event.preventDefault(); document.getElementById('success-msg').style.display='block';">
+        <div class="form-group">
+          <label for="name">Your Name</label>
+          <input type="text" id="name" placeholder="Enter your full name" required>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Account Email Address</label>
+          <input type="email" id="email" placeholder="email@example.com" required>
+        </div>
+
+        <div class="form-group">
+          <label for="reason">Reason for Deletion (Optional)</label>
+          <select id="reason">
+            <option value="no-longer-needed">No longer using the app</option>
+            <option value="privacy">Privacy concerns</option>
+            <option value="cleanup">Account reset / cleanup</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="confirmation">Confirmation</label>
+          <div style="display: flex; gap: 10px; align-items: flex-start; margin-top: 8px;">
+            <input type="checkbox" id="confirmation" required style="width: auto; margin-top: 4px;">
+            <span style="font-size: 14px; color: #475569;">
+              I understand that this action is irreversible and all my synced tournaments, scores, and draft data will be permanently destroyed.
+            </span>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="margin-top: 10px; width: 100%; justify-content: center;">
+          Submit Deletion Request
+        </button>
+
+        <div id="success-msg" style="display: none; margin-top: 20px;" class="alert-box">
+          <strong>Request Received:</strong> Your request has been queued. Our privacy compliance team will verify your account email and permanently erase your records within 7 days.
+        </div>
+      </form>
+
+      <h2>5. Alternative Direct Contact</h2>
+      <p>
+        If you prefer not to use the form, simply send an email with the subject <em>"Delete My Account"</em> to:
+      </p>
+      <p>
+        📧 <a href="mailto:privacy@60score.com?subject=Delete%20My%2060Score%20Account">privacy@60score.com</a> or <a href="mailto:support@60score.com?subject=Delete%20My%2060Score%20Account">support@60score.com</a>
+      </p>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <h3>60<span>Score</span></h3>
+          <p>Professional offline-first cricket scorer, player auction, and tournament management app.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Legal & Policies</h4>
+          <ul>
+            <li><a href="privacy-policy.html">Privacy Policy</a></li>
+            <li><a href="terms-of-service.html">Terms of Service</a></li>
+            <li><a href="data-deletion.html">Data Deletion Request</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Support</h4>
+          <ul>
+            <li><a href="contact.html">Contact Us</a></li>
+            <li><a href="contact.html#faq">Scorer FAQs</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 60Score. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

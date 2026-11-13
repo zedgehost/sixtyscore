@@ -16,11 +16,11 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:cricket_scorer_app/entity_firestore.dart';
-import 'package:cricket_scorer_app/entity_sync.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/store.dart';
-import 'package:cricket_scorer_app/sync_service.dart';
+import 'package:cricket_scorer_app/services/sync/entity_firestore.dart';
+import 'package:cricket_scorer_app/services/sync/entity_sync.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
+import 'package:cricket_scorer_app/services/sync/sync_service.dart';
 
 // ---------------- fixtures (mirroring the research harness) --------
 

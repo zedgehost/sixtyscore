@@ -1,45 +1,44 @@
 {
   "project_info": {
-    "project_number": "68009785477",
-    "project_id": "score-2ef42",
-    "storage_bucket": "score-2ef42.firebasestorage.app"
+    "project_number": "425277341454",
+    "project_id": "score-prod-50b9c",
+    "storage_bucket": "score-prod-50b9c.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:68009785477:android:42261cb06339d2b5ee51ec",
-        "android_client_info": {
-          "package_name": "com.cricscore.cricket_score_app"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyBsL_WWKG_PdFzEFeQVdd9eVfEyChZd0uo"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:68009785477:android:caddd99a93cf92ecee51ec",
+        "mobilesdk_app_id": "1:425277341454:android:e409897bec3f1ab3ef215f",
         "android_client_info": {
           "package_name": "com.cricscore.cricket_scorer_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "425277341454-7nuotfrd29e0hh8nconci4ln3a3s9aad.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cricscore.cricket_scorer_app",
+            "certificate_hash": "bd0def40570ffdf50ccb237cde1c0f56110851a9"
+          }
+        },
+        {
+          "client_id": "425277341454-5vkvjag46pj9cu3q8e48t155fpm45bp1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyBsL_WWKG_PdFzEFeQVdd9eVfEyChZd0uo"
+          "current_key": "AIzaSyCDM8O6iBxccEJfiiYNtBpDaerxDPoh2Q4"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "425277341454-5vkvjag46pj9cu3q8e48t155fpm45bp1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

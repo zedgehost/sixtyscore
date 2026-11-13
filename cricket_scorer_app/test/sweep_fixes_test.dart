@@ -5,9 +5,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:cricket_scorer_app/debug_info.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/scoring.dart';
+import 'package:cricket_scorer_app/core/utils/debug_info.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 
 List<String> xi(String p) => [for (var i = 1; i <= 11; i++) '$p$i'];
 

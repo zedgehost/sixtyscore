@@ -6,9 +6,9 @@
 // pattern), because a 50+ innings cannot be scored in a 1-over
 // engine match. Target player throughout is 'a1'.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/player_insights.dart';
-import 'package:cricket_scorer_app/scoring.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/domain/analytics/player_insights.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 
 /// 1-over match. a1 opens for ta, scores 10 (4, 6) and is bowled
 /// by b1; then bowls tb's innings and takes one caught wicket,

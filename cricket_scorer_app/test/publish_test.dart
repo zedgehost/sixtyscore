@@ -1,9 +1,9 @@
 // Tournament publishing (v1.3.0): the `published` flag on the model and
 // the public snapshot slice that viewers decode.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/publish_service.dart';
-import 'package:cricket_scorer_app/store.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/sync/publish_service.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
 
 void main() {
   group('Tournament published flag', () {

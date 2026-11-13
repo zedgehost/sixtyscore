@@ -7,7 +7,7 @@
 // the worked example below asserts what THIS table gives, with
 // the difference noted.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/dls.dart';
+import 'package:cricket_scorer_app/domain/dls/dls.dart';
 
 void main() {
   group('dlResourcePct anchors (Standard Edition table)', () {

@@ -7,8 +7,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/store.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
 
 const _teamsKey = 'cricscore_teams_v1__guest';
 const _tournKey = 'cricscore_tournaments_v1__guest';

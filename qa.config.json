@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "goal": "Verify offline cricket scoring, tournament engine, tiebreakers, and 360dp responsive UI",
+  "budgetMs": 240000,
+  "checks": [
+    {
+      "id": "flutter-analyze",
+      "command": ["cmd.exe", "/c", "flutter", "analyze", "cricket_scorer_app/lib/"],
+      "reporter": "exit-code",
+      "timeoutMs": 60000
+    },
+    {
+      "id": "tournament-deep-flow-tests",
+      "command": ["cmd.exe", "/c", "cd cricket_scorer_app && flutter test test/tournament_flow_deep_test.dart"],
+      "reporter": "exit-code",
+      "timeoutMs": 60000
+    },
+    {
+      "id": "responsive-360dp-ui-fit",
+      "command": ["cmd.exe", "/c", "cd cricket_scorer_app && flutter test test/ui_fit_test.dart"],
+      "reporter": "exit-code",
+      "timeoutMs": 60000
+    }
+  ]
+}

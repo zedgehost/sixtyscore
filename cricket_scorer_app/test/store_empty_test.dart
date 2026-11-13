@@ -3,8 +3,8 @@
 // load back unchanged, and Reset App must leave the app empty.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/store.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

@@ -13,9 +13,9 @@
 //    edited.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/scoring.dart';
-import 'package:cricket_scorer_app/store.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
 
 List<String> xi(String prefix, int n) =>
     List.generate(n, (i) => '$prefix${i + 1}');

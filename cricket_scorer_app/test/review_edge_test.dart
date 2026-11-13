@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/scoring.dart';
-import 'package:cricket_scorer_app/player_io.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
+import 'package:cricket_scorer_app/services/io/player_io.dart';
 
 Match _match({int xi = 4, int overs = 2}) => Match(
   id: 'mx',

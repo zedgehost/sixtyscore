@@ -4,10 +4,10 @@
 // dedupe guard, and long-name share-image layout.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/scoring.dart';
-import 'package:cricket_scorer_app/store.dart';
-import 'package:cricket_scorer_app/summary_share.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
+import 'package:cricket_scorer_app/services/share/summary_share.dart';
 
 Player _p(String id, String name) => Player(id: id, name: name);
 

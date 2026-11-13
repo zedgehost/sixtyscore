@@ -7,8 +7,8 @@
 // so a completed match can never be un-completed or erased by a
 // staler copy, whichever side it sits on.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/sync_service.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/sync/sync_service.dart';
 
 InningsState inn({
   int legalBalls = 0,

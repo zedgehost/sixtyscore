@@ -6,9 +6,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:cricket_scorer_app/entity_sync.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/store.dart';
+import 'package:cricket_scorer_app/services/sync/entity_sync.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
 
 List<String> xiIds(String p) => [for (var i = 1; i <= 11; i++) '$p$i'];
 

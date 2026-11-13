@@ -11,10 +11,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/scoring.dart';
-import 'package:cricket_scorer_app/screens/scorecard_edit_screen.dart';
-import 'package:cricket_scorer_app/store.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
+import 'package:cricket_scorer_app/views/screens/scorecard/scorecard_edit_screen.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
 
 Team _team(String id, String p) => Team(
       id: id,

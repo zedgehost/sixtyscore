@@ -5,9 +5,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/poster_summary.dart';
-import 'package:cricket_scorer_app/store.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/share/poster_summary.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
 
 Player _p(String id, String name) => Player(id: id, name: name);
 

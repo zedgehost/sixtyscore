@@ -1,6 +1,6 @@
 // Tournament logo (v1.2.2): optional logoBase64 on the Tournament model.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
+import 'package:cricket_scorer_app/models/models.dart';
 
 void main() {
   group('Tournament logoBase64', () {

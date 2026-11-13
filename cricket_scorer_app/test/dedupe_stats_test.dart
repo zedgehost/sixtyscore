@@ -1,6 +1,6 @@
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/player_insights.dart';
-import 'package:cricket_scorer_app/scoring.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/domain/analytics/player_insights.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Builds a match with the given totals, directly on the innings

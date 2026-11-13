@@ -4,8 +4,8 @@
 // caught / lbw / stumped / hit wicket; everything else is a team
 // wicket with no bowler credit.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/scoring.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 
 Match makeMatch({int xi = 5, int overs = 2}) {
   return Match(

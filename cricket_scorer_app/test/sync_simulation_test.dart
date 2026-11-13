@@ -41,8 +41,8 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/sync_service.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/sync/sync_service.dart';
 
 // ---------------------------------------------------------------------
 // Fixtures (shared by all candidates)

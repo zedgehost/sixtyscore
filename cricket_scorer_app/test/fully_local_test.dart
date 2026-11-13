@@ -10,12 +10,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:cricket_scorer_app/models.dart';
-import 'package:cricket_scorer_app/publish_service.dart';
-import 'package:cricket_scorer_app/scoring.dart';
-import 'package:cricket_scorer_app/screens/profile_screen.dart';
-import 'package:cricket_scorer_app/store.dart';
-import 'package:cricket_scorer_app/sync_service.dart';
+import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/sync/publish_service.dart';
+import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
+import 'package:cricket_scorer_app/views/screens/teams/profile_screen.dart';
+import 'package:cricket_scorer_app/services/storage/store.dart';
+import 'package:cricket_scorer_app/services/sync/sync_service.dart';
 
 Future<Store> _guestStore() async {
   SharedPreferences.setMockInitialValues({});
