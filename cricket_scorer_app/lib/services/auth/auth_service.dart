@@ -12,11 +12,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 
-/// Web OAuth 2.0 Client ID from Google Cloud / Firebase project `score-18565`.
+/// Web OAuth 2.0 Client ID from Google Cloud / Firebase project `score-prod-50b9c` (60Score-Prod).
 /// Passed as `serverClientId` on Android so `google_sign_in` returns a valid `idToken`
 /// for our cPanel PHP backend (`/api/auth/google`) to verify.
 const String kGoogleWebClientId =
-    '241986365674-oac3shqmfifnt54bs3nlnktkqvnd8qka.apps.googleusercontent.com';
+        '425277341454-5vkvjag46pj9cu3q8e48t155fpm45bp1.apps.googleusercontent.com';
 
 /// Result of an auth attempt.
 enum AuthStatus {
