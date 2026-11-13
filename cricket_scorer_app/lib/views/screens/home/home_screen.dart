@@ -63,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen>
   List<RemoteMatchSummary> _remoteRecent = [];
   List<Team> _remoteTeams = [];
   List<Player> _remotePlayers = [];
+  bool _searchingRemote = false;
   bool _loadingFeed = false;
   bool _feedOffline = false;
   String? _openingRemoteId;
@@ -115,14 +116,22 @@ class _HomeScreenState extends State<HomeScreen>
         setState(() {
           _remoteTeams = [];
           _remotePlayers = [];
+          _searchingRemote = false;
         });
       }
       return;
     }
 
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
+    if (mounted) {
+      setState(() => _searchingRemote = true);
+    }
+
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () async {
       final q = query.trim();
-      if (q.isEmpty) return;
+      if (q.isEmpty) {
+        if (mounted) setState(() => _searchingRemote = false);
+        return;
+      }
       try {
         final client = widget.apiClient ?? CpanelApiClient();
         if (widget.apiClient == null) await client.init();
@@ -185,9 +194,12 @@ class _HomeScreenState extends State<HomeScreen>
           setState(() {
             _remoteTeams = foundTeams;
             _remotePlayers = foundPlayers;
+            _searchingRemote = false;
           });
         }
-      } catch (_) {}
+      } catch (_) {
+        if (mounted) setState(() => _searchingRemote = false);
+      }
     });
   }
 
@@ -456,10 +468,27 @@ class _HomeScreenState extends State<HomeScreen>
                     minHeight: 36,
                   ),
                   suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.close, size: 16),
-                          color: PitchTheme.outline,
-                          onPressed: () => _searchController.clear(),
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_searchingRemote)
+                              const Padding(
+                                padding: EdgeInsets.only(right: 6.0),
+                                child: SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: PitchTheme.primary,
+                                  ),
+                                ),
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 16),
+                              color: PitchTheme.outline,
+                              onPressed: () => _searchController.clear(),
+                            ),
+                          ],
                         )
                       : null,
                   isDense: true,
@@ -693,6 +722,43 @@ class _HomeScreenState extends State<HomeScreen>
         matchedTournaments.length;
 
     if (totalResults == 0) {
+      if (_searchingRemote) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 50),
+          child: Center(
+            child: Column(
+              children: [
+                const SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: PitchTheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Searching online for "$_searchQuery"...',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: PitchTheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Looking up players and teams in cloud database',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: PitchTheme.outline,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
       return SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
         child: Center(
