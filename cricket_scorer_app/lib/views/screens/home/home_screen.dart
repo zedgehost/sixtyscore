@@ -61,10 +61,13 @@ class _HomeScreenState extends State<HomeScreen>
 
   List<RemoteMatchSummary> _remoteLive = [];
   List<RemoteMatchSummary> _remoteRecent = [];
+  List<Team> _remoteTeams = [];
+  List<Player> _remotePlayers = [];
   bool _loadingFeed = false;
   bool _feedOffline = false;
   String? _openingRemoteId;
   Timer? _feedTimer;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -84,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen>
       final q = _searchController.text.trim().toLowerCase();
       if (q != _searchQuery) {
         setState(() => _searchQuery = q);
+        _triggerRemoteSearch(q);
       }
     });
 
@@ -96,11 +100,95 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _feedTimer?.cancel();
     _pulseController.dispose();
     _searchController.dispose();
     store.removeListener(_onStoreChanged);
     super.dispose();
+  }
+
+  void _triggerRemoteSearch(String query) {
+    _searchDebounce?.cancel();
+    if (query.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _remoteTeams = [];
+          _remotePlayers = [];
+        });
+      }
+      return;
+    }
+
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
+      final q = query.trim();
+      if (q.isEmpty) return;
+      try {
+        final client = widget.apiClient ?? CpanelApiClient();
+        if (widget.apiClient == null) await client.init();
+
+        final resTeams = await client.searchTeams(q);
+        final foundTeams = <Team>[];
+        final foundPlayers = <Player>[];
+
+        if (resTeams['status'] == 'success' && resTeams['data'] is List) {
+          for (final item in (resTeams['data'] as List)) {
+            if (item is Map) {
+              final teamMap = Map<String, dynamic>.from(item);
+              final t = Team(
+                id: (teamMap['id'] ?? '').toString(),
+                name: (teamMap['name'] ?? 'Team').toString(),
+              );
+              foundTeams.add(t);
+
+              if (teamMap['players'] is List) {
+                for (final pItem in (teamMap['players'] as List)) {
+                  if (pItem is Map) {
+                    final pm = Map<String, dynamic>.from(pItem);
+                    foundPlayers.add(Player(
+                      id: (pm['id'] ?? '').toString(),
+                      name: (pm['name'] ?? 'Player').toString(),
+                      jerseyNo: int.tryParse((pm['jersey_no'] ?? '0').toString()) ?? 0,
+                      role: (pm['role'] ?? 'Batter').toString(),
+                      userCode: (pm['user_code'] ?? '').toString(),
+                      isVerified: pm['is_verified'] == 1 || pm['is_verified'] == true,
+                    ));
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Also hit direct player search API
+        final resPlayers = await client.searchPlayers(q);
+        if (resPlayers['status'] == 'success' && resPlayers['data'] is List) {
+          for (final item in (resPlayers['data'] as List)) {
+            if (item is Map) {
+              final pm = Map<String, dynamic>.from(item);
+              final pId = (pm['id'] ?? '').toString();
+              if (!foundPlayers.any((x) => x.id == pId)) {
+                foundPlayers.add(Player(
+                  id: pId,
+                  name: (pm['name'] ?? 'Player').toString(),
+                  jerseyNo: 0,
+                  role: (pm['role'] ?? 'Batter').toString(),
+                  userCode: (pm['user_code'] ?? '').toString(),
+                  isVerified: pm['is_verified'] == 1 || pm['is_verified'] == true,
+                ));
+              }
+            }
+          }
+        }
+
+        if (mounted && _searchQuery.isNotEmpty) {
+          setState(() {
+            _remoteTeams = foundTeams;
+            _remotePlayers = foundPlayers;
+          });
+        }
+      } catch (_) {}
+    });
   }
 
   Future<void> _loadCachedFeed() async {
@@ -490,12 +578,23 @@ class _HomeScreenState extends State<HomeScreen>
           rm.id.toLowerCase().contains(query);
     }).toList();
 
-    // 2. Teams (by Name or TM-XXXXXX Code)
+    // 2. Teams (by Name or TM-XXXXXX Code - Local + Remote)
+    final localTeamIds = store.teams.map((t) => t.id).toSet();
     final matchedTeams = store.teams.where((t) {
       return t.name.toLowerCase().contains(query) ||
           t.teamCode.toLowerCase().contains(query) ||
           t.id.toLowerCase().contains(query);
     }).toList();
+
+    for (final rt in _remoteTeams) {
+      if (!localTeamIds.contains(rt.id)) {
+        if (rt.name.toLowerCase().contains(query) ||
+            rt.teamCode.toLowerCase().contains(query) ||
+            rt.id.toLowerCase().contains(query)) {
+          matchedTeams.add(rt);
+        }
+      }
+    }
 
     // 3. Players (from regPlayers, all team squads, and match participants)
     final seenPlayerIds = <String>{};
@@ -559,6 +658,23 @@ class _HomeScreenState extends State<HomeScreen>
                   userCode: userCodeForUid(pid),
                 ));
           }
+        }
+      }
+    }
+
+    // Also include any remote players from live server
+    for (final rp in _remotePlayers) {
+      if (seenPlayerIds.add(rp.id)) {
+        final pName = rp.name.toLowerCase();
+        final code = (rp.userCode ?? userCodeForUid(rp.id)).toLowerCase();
+        final cleanCode = code.replaceAll('-', '').replaceAll(' ', '');
+        final id = rp.id.toLowerCase();
+        if (pName.contains(query) ||
+            code.contains(query) ||
+            cleanCode.contains(cleanQuery) ||
+            id.contains(query) ||
+            (rp.jerseyNo > 0 && '${rp.jerseyNo}' == query)) {
+          matchedPlayers.add(rp);
         }
       }
     }

@@ -92,15 +92,12 @@ class _LoginScreenState extends State<LoginScreen> {
             jerseyNumber: cu.jerseyNumber,
             city: cu.city,
           );
-          if (store.matches.isEmpty &&
-              store.teams.isEmpty &&
-              store.tournaments.isEmpty) {
-            final client = CpanelApiClient();
-            await client.init();
-            unawaited(
-              CpanelSyncService(store: store, apiClient: client).pullAndMerge(),
-            );
-          }
+          // Always pull and merge latest cloud data on login
+          final client = CpanelApiClient();
+          await client.init();
+          unawaited(
+            CpanelSyncService(store: store, apiClient: client).pullAndMerge(),
+          );
         } else {
           final fu = _auth.currentUser;
           if (fu != null) {
