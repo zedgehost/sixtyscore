@@ -92,12 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
             jerseyNumber: cu.jerseyNumber,
             city: cu.city,
           );
-          // Always pull and merge latest cloud data on login
-          final client = CpanelApiClient();
-          await client.init();
-          unawaited(
-            CpanelSyncService(store: store, apiClient: client).pullAndMerge(),
-          );
+          // Login only syncs user's own data, not entire global database
         } else {
           final fu = _auth.currentUser;
           if (fu != null) {
