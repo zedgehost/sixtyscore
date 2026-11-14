@@ -313,6 +313,15 @@ class Tournament {
   /// v1.3.7 have no such field and read as the Super Sixty default.
   int oversLimit;
 
+  /// Tournament competition structure: Round Robin, Knockout, or League + Playoffs
+  String format;
+
+  /// Match default ball type: Tennis Ball, Tape Ball, Leather Ball
+  String ballType;
+
+  /// Tournament starting date in ISO-8601 format (YYYY-MM-DD)
+  String startDateIso;
+
   Tournament({
     required this.id,
     required this.name,
@@ -320,6 +329,9 @@ class Tournament {
     this.venue = '',
     this.logoBase64 = '',
     this.creatorId = '',
+    this.format = 'Round Robin',
+    this.ballType = 'Tennis Ball',
+    this.startDateIso = '',
     Map<String, int>? pointsAdjustments,
     Map<String, PointsTableOverride>? pointsTableOverrides,
     Map<String, PlayerStatsOverride>? playerStatsOverrides,
@@ -341,6 +353,9 @@ class Tournament {
     'venue': venue,
     'logoBase64': logoBase64,
     'creatorId': creatorId,
+    'format': format,
+    'ballType': ballType,
+    'startDateIso': startDateIso,
     'pointsAdjustments': pointsAdjustments,
     'pointsTableOverrides': {
       for (final e in pointsTableOverrides.entries) e.key: e.value.toJson(),
@@ -416,6 +431,9 @@ class Tournament {
       qualificationFinalized: j['qualificationFinalized'] as bool? ?? false,
       published: j['published'] as bool? ?? false,
       oversLimit: (j['oversLimit'] as num?)?.toInt() ?? 8,
+      format: j['format'] as String? ?? 'Round Robin',
+      ballType: j['ballType'] as String? ?? 'Tennis Ball',
+      startDateIso: j['startDateIso'] as String? ?? '',
     );
   }
 }

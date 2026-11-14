@@ -21,6 +21,8 @@ import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
 import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/core/theme/theme.dart';
+import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
+import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
 import 'package:cricket_scorer_app/views/screens/tournament/fixture_detail_screen.dart' show stageLabel;
 
 class FixtureEditScreen extends StatefulWidget {
@@ -164,6 +166,7 @@ class _FixtureEditScreenState extends State<FixtureEditScreen> {
         season: _seasonCtrl.text.trim(),
       );
       await store.upsertMatch(m);
+      CpanelSyncService(store: store, apiClient: CpanelApiClient()).triggerAutoSync();
       if (!mounted) return;
       _snack('Fixture updated.');
       Navigator.pop(context, true);

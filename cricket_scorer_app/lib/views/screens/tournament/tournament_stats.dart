@@ -7,6 +7,7 @@ import 'package:cricket_scorer_app/models/models.dart';
 import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/services/share/stats_share.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
+import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
 import 'package:cricket_scorer_app/core/theme/theme.dart';
 import 'package:cricket_scorer_app/views/widgets/stat_category_card.dart';
 import 'package:cricket_scorer_app/views/screens/teams/stats_screen.dart' show CompareScreen, allPersons;
@@ -45,35 +46,35 @@ class _LeaderRow {
 (IconData, Color) _categoryStyle(String label) {
   switch (label) {
     case 'Most Runs':
-      return (Icons.sports_cricket, kGold);
+      return (Icons.sports_cricket, PitchTheme.secondary);
     case 'Most Wickets':
-      return (Icons.sports_baseball, kCyan);
+      return (Icons.sports_baseball, PitchTheme.primary);
     case 'Highest Score':
-      return (Icons.emoji_events, kGold);
+      return (Icons.emoji_events, PitchTheme.secondary);
     case 'Best Bowling':
-      return (Icons.bolt, kCyan);
+      return (Icons.bolt, PitchTheme.primary);
     case 'Most Sixes':
-      return (Icons.looks_6, kGold);
+      return (Icons.looks_6, PitchTheme.secondary);
     case 'Most Fours':
-      return (Icons.looks_4, kGold);
+      return (Icons.looks_4, PitchTheme.secondary);
     case 'Most Catches':
-      return (Icons.front_hand, kCyan);
+      return (Icons.front_hand, PitchTheme.primary);
     case 'Most Stumpings':
-      return (Icons.back_hand, kCyan);
+      return (Icons.back_hand, PitchTheme.primary);
     case 'Fastest Fifty':
-      return (Icons.timer, kGold);
+      return (Icons.timer, PitchTheme.secondary);
     case 'Fastest Hundred':
-      return (Icons.speed, kGold);
+      return (Icons.speed, PitchTheme.secondary);
     case 'Best Partnership':
-      return (Icons.people, kGold);
+      return (Icons.people, PitchTheme.secondary);
     case 'Most Balls Faced':
-      return (Icons.adjust, kGold);
+      return (Icons.adjust, PitchTheme.secondary);
     case 'Most Sixes (Innings)':
-      return (Icons.rocket_launch, kGold);
+      return (Icons.rocket_launch, PitchTheme.secondary);
     case 'Most Fours (Innings)':
-      return (Icons.bolt_outlined, kGold);
+      return (Icons.bolt_outlined, PitchTheme.secondary);
     default:
-      return (Icons.bar_chart, kCyan);
+      return (Icons.bar_chart, PitchTheme.primary);
   }
 }
 
@@ -540,7 +541,7 @@ class _LeaderboardScreen extends StatelessWidget {
             trailing: Text(
               r.primary,
               style: const TextStyle(
-                color: kCyan,
+                color: PitchTheme.secondary,
                 fontWeight: FontWeight.bold,
                 fontSize: 15,
               ),
