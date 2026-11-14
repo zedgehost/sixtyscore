@@ -2691,7 +2691,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        'New Tourney',
+                        'New Tournament',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 15,
@@ -3056,26 +3056,26 @@ class _HomeScreenState extends State<HomeScreen>
         // 3-Column Responsive Row
         Row(
           children: [
-            // 1. My Tournaments
+            // 1. My Tournament
             Expanded(
               child: _buildDirectoryCard(
                 icon: Icons.emoji_events,
                 iconBg: PitchTheme.secondaryContainer.withValues(alpha: 0.5),
                 iconColor: PitchTheme.secondary,
-                title: 'My Tourney',
+                title: 'My Tournament',
                 subtitle: '$tourneyCount Active',
                 onTap: () => _push(TournamentsScreen(store: store)),
               ),
             ),
             const SizedBox(width: 8),
 
-            // 2. My Squads
+            // 2. My Team
             Expanded(
               child: _buildDirectoryCard(
                 icon: Icons.shield_outlined,
                 iconBg: PitchTheme.primaryContainer,
                 iconColor: PitchTheme.tertiaryFixed,
-                title: 'My Squads',
+                title: 'My Team',
                 subtitle: topTeam,
                 onTap: () => _push(TeamsScreen(store: store)),
               ),
