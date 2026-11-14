@@ -27,6 +27,8 @@ import 'package:cricket_scorer_app/views/screens/tournament/fixture_detail_scree
 import 'package:cricket_scorer_app/views/screens/tournament/nrr_calculator_screen.dart';
 import 'package:cricket_scorer_app/views/screens/tournament/qualification_chances_screen.dart';
 import 'package:cricket_scorer_app/views/screens/tournament/tournament_stats.dart';
+import 'package:cricket_scorer_app/views/screens/teams/teams_screen.dart'
+    show TeamDetailScreen;
 import 'package:cricket_scorer_app/views/screens/tournament/tournaments_screen.dart'
     show showTournamentEditDialog;
 import 'package:cricket_scorer_app/views/widgets/guest_guard.dart';
@@ -875,7 +877,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     final playoffFixtures = playoffMatchesOf(tournament.id, store.matches);
 
     return DefaultTabController(
-      length: 3,
+      length: 5,
       initialIndex: 0,
       child: Scaffold(
         backgroundColor: PitchTheme.surface,
@@ -940,6 +942,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             child: Container(
               color: PitchTheme.surface,
               child: const TabBar(
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
                 indicatorColor: PitchTheme.primary,
                 indicatorWeight: 3,
                 labelColor: PitchTheme.primary,
@@ -948,7 +952,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                 tabs: [
                   Tab(text: 'Fixtures'),
                   Tab(text: 'Points Table'),
-                  Tab(text: 'Leaderboard Stats'),
+                  Tab(text: 'Teams & Squads'),
+                  Tab(text: 'Leaderboards'),
+                  Tab(text: 'Overview & Rules'),
                 ],
               ),
             ),
@@ -994,8 +1000,14 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                   // Tab 2: Points Table
                   _buildPointsTableTab(rows, qualifierIds),
 
-                  // Tab 3: Leaderboard Stats
+                  // Tab 3: Teams & Squads
+                  _buildTeamsTab(),
+
+                  // Tab 4: Leaderboard Stats
                   TournamentStatsTab(store: store, tournament: tournament),
+
+                  // Tab 5: Overview & Specifications
+                  _buildOverviewTab(leagueFixtures, playoffFixtures),
                 ],
               ),
             ),
@@ -1820,5 +1832,808 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
         );
       }
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // TAB 3: TEAMS & SQUADS MANAGEMENT
+  // ---------------------------------------------------------------------------
+
+  Widget _buildTeamsTab() {
+    final enrolledTeamIds = tournament.teamIds;
+    final enrolledTeams = enrolledTeamIds
+        .map((id) => store.teamById(id))
+        .whereType<Team>()
+        .toList();
+
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 90),
+      children: [
+        // Action Header
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Participating Teams',
+                  style: TextStyle(
+                    color: PitchTheme.onSurface,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: PitchTheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${enrolledTeams.length}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: PitchTheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: PitchTheme.primary,
+                    side: const BorderSide(color: PitchTheme.outlineVariant),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.playlist_add, size: 16),
+                  label: const Text('Enroll Teams', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                  onPressed: _showEnrollTeamsDialog,
+                ),
+                const SizedBox(width: 6),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: PitchTheme.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('+ New Team', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                  onPressed: _showCreateTeamForTournamentDialog,
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        if (enrolledTeams.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: PitchTheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: PitchTheme.secondaryContainer.withValues(alpha: 0.35),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.group_add_outlined, size: 36, color: PitchTheme.secondary),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'No teams enrolled yet',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: PitchTheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Add existing teams or create new squads to start generating fixtures and tracking standings.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12.5, color: PitchTheme.outline),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: PitchTheme.primary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.playlist_add, size: 16),
+                      label: const Text('Enroll Existing Teams'),
+                      onPressed: _showEnrollTeamsDialog,
+                    ),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: PitchTheme.primary,
+                        side: const BorderSide(color: PitchTheme.outlineVariant),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Create New Team'),
+                      onPressed: _showCreateTeamForTournamentDialog,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          )
+        else
+          ...enrolledTeams.map((team) {
+            final matchesCount = store.matches
+                .where((m) => m.tournamentId == tournament.id && (m.teamAId == team.id || m.teamBId == team.id))
+                .length;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: PitchTheme.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.6)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TeamDetailScreen(store: store, team: team),
+                    ),
+                  ).then((_) {
+                    if (mounted) setState(() {});
+                  }),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CaptainAvatar(store: store, teamId: team.id),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          team.name,
+                                          style: const TextStyle(
+                                            color: PitchTheme.onSurface,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: PitchTheme.surfaceContainer,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          team.teamCode,
+                                          style: const TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: PitchTheme.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '${team.players.length} Squad Players · $matchesCount Tournament Fixtures',
+                                    style: const TextStyle(
+                                      color: PitchTheme.outline,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Divider(height: 1),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: const [
+                                Icon(Icons.sports_cricket, size: 14, color: PitchTheme.secondary),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Active Squad',
+                                  style: TextStyle(
+                                    color: PitchTheme.onSurfaceVariant,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                TextButton.icon(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: PitchTheme.secondary,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  icon: const Icon(Icons.people_alt_outlined, size: 15),
+                                  label: const Text(
+                                    'View Squad',
+                                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                                  ),
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => TeamDetailScreen(store: store, team: team),
+                                    ),
+                                  ).then((_) {
+                                    if (mounted) setState(() {});
+                                  }),
+                                ),
+                                IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.all(4),
+                                  icon: const Icon(Icons.delete_outline, size: 18, color: PitchTheme.error),
+                                  tooltip: 'Remove from tournament',
+                                  onPressed: () => _removeTeamFromTournament(team),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Future<void> _showEnrollTeamsDialog() async {
+    final currentSelected = Set<String>.from(tournament.teamIds);
+    String query = '';
+
+    final savedSelected = await showDialog<Set<String>>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, setD) {
+          final filteredTeams = store.teams.where((t) {
+            final q = query.trim().toLowerCase();
+            return q.isEmpty ||
+                t.name.toLowerCase().contains(q) ||
+                t.teamCode.toLowerCase().contains(q);
+          }).toList();
+
+          return AlertDialog(
+            backgroundColor: PitchTheme.surfaceContainerLowest,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Enroll Teams',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 17,
+                    color: PitchTheme.onSurface,
+                  ),
+                ),
+                Text(
+                  '${currentSelected.length} Selected',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: PitchTheme.secondary,
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search teams...',
+                      prefixIcon: const Icon(Icons.search, size: 18),
+                      isDense: true,
+                      fillColor: PitchTheme.surfaceContainerLow,
+                      filled: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: (v) => setD(() => query = v),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton(
+                        onPressed: () => setD(() {
+                          currentSelected.addAll(store.teams.map((t) => t.id));
+                        }),
+                        child: const Text('Select All', style: TextStyle(fontSize: 12)),
+                      ),
+                      TextButton(
+                        onPressed: () => setD(() {
+                          currentSelected.clear();
+                        }),
+                        child: const Text('Clear All', style: TextStyle(fontSize: 12, color: PitchTheme.error)),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 1),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 280),
+                    child: filteredTeams.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text(
+                                  'No teams registered yet',
+                                  style: TextStyle(color: PitchTheme.outline),
+                                ),
+                                const SizedBox(height: 8),
+                                OutlinedButton.icon(
+                                  onPressed: () {
+                                    Navigator.pop(c);
+                                    _showCreateTeamForTournamentDialog();
+                                  },
+                                  icon: const Icon(Icons.add, size: 16),
+                                  label: const Text('Create New Team'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filteredTeams.length,
+                            itemBuilder: (_, i) {
+                              final tm = filteredTeams[i];
+                              final isChecked = currentSelected.contains(tm.id);
+                              return CheckboxListTile(
+                                value: isChecked,
+                                activeColor: PitchTheme.secondary,
+                                title: Text(
+                                  tm.name,
+                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                                ),
+                                subtitle: Text(
+                                  '${tm.players.length} Players • ${tm.teamCode}',
+                                  style: const TextStyle(fontSize: 11, color: PitchTheme.outline),
+                                ),
+                                onChanged: (v) {
+                                  setD(() {
+                                    if (v == true) {
+                                      currentSelected.add(tm.id);
+                                    } else {
+                                      currentSelected.remove(tm.id);
+                                    }
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(c, null),
+                child: const Text('Cancel', style: TextStyle(color: PitchTheme.outline)),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: PitchTheme.primary),
+                onPressed: () => Navigator.pop(c, currentSelected),
+                child: const Text('Save Teams'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (savedSelected != null) {
+      tournament.teamIds = savedSelected.toList();
+      await store.persistTournamentsOnly();
+      _triggerCloudSync();
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Updated tournament teams (${tournament.teamIds.length} enrolled)')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showCreateTeamForTournamentDialog() async {
+    final nameCtrl = TextEditingController();
+
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: PitchTheme.surfaceContainerLowest,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Create & Enroll New Team',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Team Name *',
+                hintText: 'e.g. Lahore Qalandars',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel', style: TextStyle(color: PitchTheme.outline)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: PitchTheme.primary),
+            onPressed: () {
+              if (nameCtrl.text.trim().isEmpty) return;
+              Navigator.pop(c, true);
+            },
+            child: const Text('Create & Enroll'),
+          ),
+        ],
+      ),
+    );
+
+    if (created == true && nameCtrl.text.trim().isNotEmpty) {
+      final newTeam = Team(
+        id: 'team_${DateTime.now().millisecondsSinceEpoch}',
+        name: nameCtrl.text.trim(),
+        players: [],
+      );
+
+      await store.upsertTeam(newTeam);
+      if (!tournament.teamIds.contains(newTeam.id)) {
+        tournament.teamIds.add(newTeam.id);
+        await store.persistTournamentsOnly();
+      }
+      _triggerCloudSync();
+
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Team "${newTeam.name}" created and enrolled into tournament!')),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeTeamFromTournament(Team team) async {
+    final matchesInTournament = store.matches
+        .where((m) => m.tournamentId == tournament.id && (m.teamAId == team.id || m.teamBId == team.id))
+        .length;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: PitchTheme.surfaceContainerLowest,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Remove ${team.name}?',
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        content: Text(
+          matchesInTournament > 0
+              ? 'Warning: This team is involved in $matchesInTournament scheduled or completed match(es) in this tournament. Are you sure you want to remove it?'
+              : 'Remove "${team.name}" from this tournament?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel', style: TextStyle(color: PitchTheme.outline)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: PitchTheme.error),
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Remove Team'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      tournament.teamIds.remove(team.id);
+      await store.persistTournamentsOnly();
+      _triggerCloudSync();
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Removed ${team.name} from tournament.')),
+        );
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // TAB 5: OVERVIEW & TOURNAMENT SPECIFICATIONS
+  // ---------------------------------------------------------------------------
+
+  Widget _buildOverviewTab(List<Match> leagueFixtures, List<Match> playoffFixtures) {
+    final totalMatches = leagueFixtures.length + playoffFixtures.length;
+    final completedMatches = store.matches
+        .where((m) => m.tournamentId == tournament.id && m.status == 'completed')
+        .length;
+    final liveMatches = store.matches
+        .where((m) => m.tournamentId == tournament.id && m.status == 'live')
+        .length;
+
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 90),
+      children: [
+        // Tournament Progress Telemetry
+        Container(
+          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: PitchTheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.6)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.analytics_outlined, size: 18, color: PitchTheme.secondary),
+                  SizedBox(width: 8),
+                  Text(
+                    'Tournament Progression',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14.5,
+                      color: PitchTheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildStatColumn('Total Matches', '$totalMatches', PitchTheme.onSurface),
+                  _buildStatColumn('Live Now', '$liveMatches', PitchTheme.error),
+                  _buildStatColumn('Completed', '$completedMatches', PitchTheme.secondary),
+                  _buildStatColumn('Teams', '${tournament.teamIds.length}', PitchTheme.primary),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // Tournament Rules & Specs Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: PitchTheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.6)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.rule_outlined, size: 18, color: PitchTheme.secondary),
+                  SizedBox(width: 8),
+                  Text(
+                    'Competition Specifications',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14.5,
+                      color: PitchTheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              _buildSpecRow('Competition Format', tournament.format.isNotEmpty ? tournament.format : 'Round Robin'),
+              _buildSpecRow('Overs Limit', '${tournament.oversLimit} Overs per side'),
+              _buildSpecRow('Match Ball', tournament.ballType.isNotEmpty ? tournament.ballType : 'Tennis Ball'),
+              _buildSpecRow('Primary Venue', tournament.venue.isNotEmpty ? tournament.venue : 'Official Grounds'),
+              if (tournament.startDateIso.isNotEmpty)
+                _buildSpecRow('Commencement', tournament.startDateIso),
+              _buildSpecRow('Points for Victory', '2 Points'),
+              _buildSpecRow('Points for Tie / No Result', '1 Point'),
+              _buildSpecRow('Net Run Rate Metric', 'ICC Standard aggregate equation'),
+            ],
+          ),
+        ),
+
+        // Quick Admin Actions
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: PitchTheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.6)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.tune_outlined, size: 18, color: PitchTheme.secondary),
+                  SizedBox(width: 8),
+                  Text(
+                    'Tournament Management',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14.5,
+                      color: PitchTheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.edit_outlined, color: PitchTheme.primary),
+                title: const Text('Edit Tournament Details', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                subtitle: const Text('Update name, venue, ball type, overs limit', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
+                trailing: const Icon(Icons.chevron_right, size: 18),
+                onTap: _editTournamentDetails,
+              ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.groups_outlined, color: PitchTheme.primary),
+                title: const Text('Player Auction / Draft', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                subtitle: const Text('Live bidding & team draft management', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
+                trailing: const Icon(Icons.chevron_right, size: 18),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DraftListScreen(
+                      store: store,
+                      initialTournamentId: tournament.id,
+                    ),
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.share_outlined, color: PitchTheme.primary),
+                title: const Text('Share Points Table', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                subtitle: const Text('Export branded PNG standings card', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
+                trailing: const Icon(Icons.chevron_right, size: 18),
+                onTap: () => sharePointsTableImage(context, store, tournament),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatColumn(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 20,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            color: PitchTheme.outline,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSpecRow(String title, String val) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: const TextStyle(color: PitchTheme.outline, fontSize: 12.5)),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              val,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: PitchTheme.onSurface,
+              ),
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
