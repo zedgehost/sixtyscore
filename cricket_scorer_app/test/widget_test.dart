@@ -22,7 +22,7 @@ void main() {
     await tester.ensureVisible(guestBtn);
     await tester.tap(guestBtn);
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.textContaining('Premier Cricket Cup'), findsWidgets);
+    expect(find.textContaining('ACTIVE TOURNAMENTS'), findsWidgets);
     expect(find.text('Home'), findsWidgets);
     expect(find.text('Matches'), findsWidgets);
   });

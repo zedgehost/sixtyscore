@@ -275,6 +275,7 @@ class Tournament {
   List<String> teamIds;
   String venue;
   String logoBase64; // optional tournament logo (base64 JPEG), '' if none
+  String creatorId; // Creator / Owner user ID
   Map<String, int> pointsAdjustments; // teamId -> extra (custom) points
   /// Manual points-table row overrides (v1.4.4): teamId -> edited row.
   /// Empty means every row is computed. Removed per team via Reset.
@@ -318,6 +319,7 @@ class Tournament {
     List<String>? teamIds,
     this.venue = '',
     this.logoBase64 = '',
+    this.creatorId = '',
     Map<String, int>? pointsAdjustments,
     Map<String, PointsTableOverride>? pointsTableOverrides,
     Map<String, PlayerStatsOverride>? playerStatsOverrides,
@@ -338,6 +340,7 @@ class Tournament {
     'teamIds': teamIds,
     'venue': venue,
     'logoBase64': logoBase64,
+    'creatorId': creatorId,
     'pointsAdjustments': pointsAdjustments,
     'pointsTableOverrides': {
       for (final e in pointsTableOverrides.entries) e.key: e.value.toJson(),
@@ -401,6 +404,7 @@ class Tournament {
       teamIds: ((j['teamIds'] as List?) ?? []).map((e) => e as String).toList(),
       venue: j['venue'] as String? ?? '',
       logoBase64: j['logoBase64'] as String? ?? '',
+      creatorId: j['creatorId'] as String? ?? j['owner_uid'] as String? ?? '',
       pointsAdjustments: adj,
       pointsTableOverrides: overrides,
       playerStatsOverrides: statOverrides,

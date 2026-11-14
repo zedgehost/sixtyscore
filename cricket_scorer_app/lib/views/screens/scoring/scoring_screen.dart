@@ -102,6 +102,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
       unawaited(SyncService().syncAfterScoring(store));
     }
     NavMemory.clear('scoring', match.id);
+    CpanelSyncService.cancelDebounce();
     super.dispose();
   }
 

@@ -18,6 +18,7 @@ import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/auth/user_code.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
+import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
 import 'package:cricket_scorer_app/views/screens/home/scorer_home_screen.dart';
 import 'package:cricket_scorer_app/views/screens/scorecard/scorecard_screen.dart';
 import 'package:cricket_scorer_app/views/screens/scoring/match_setup_screen.dart';
@@ -233,6 +234,17 @@ class _HomeScreenState extends State<HomeScreen>
       final client = widget.apiClient ?? CpanelApiClient();
       if (widget.apiClient == null) {
         await client.init();
+      }
+      if (client.token != null && client.token!.isNotEmpty) {
+        unawaited(() async {
+          try {
+            final syncService = CpanelSyncService(store: store, apiClient: client);
+            final counts = await syncService.pullAndMerge();
+            if (counts != null && mounted) {
+              setState(() {});
+            }
+          } catch (_) {}
+        }());
       }
       final res = await client.getMatchesFeed(limit: 15);
       if (!mounted) return;
@@ -2715,8 +2727,12 @@ class _HomeScreenState extends State<HomeScreen>
   // 6. SECTION 4: ACTIVE TOURNAMENTS
   // ---------------------------------------------------------------------------
   Widget _buildActiveTournamentsSection() {
-    final tournaments = store.tournaments;
-    final activeCount = tournaments.isNotEmpty ? tournaments.length : 3;
+    final uid = store.effectiveUserId;
+    final userTournaments = store.tournaments.where((t) {
+      if (t.creatorId.isEmpty) return true;
+      return uid.isNotEmpty && t.creatorId == uid;
+    }).toList();
+    final activeCount = userTournaments.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2742,13 +2758,17 @@ class _HomeScreenState extends State<HomeScreen>
                     vertical: 2.0,
                   ),
                   decoration: BoxDecoration(
-                    color: PitchTheme.secondaryContainer,
+                    color: activeCount > 0
+                        ? PitchTheme.secondaryContainer
+                        : PitchTheme.surfaceContainer,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     '$activeCount Active',
-                    style: const TextStyle(
-                      color: PitchTheme.onSecondaryContainer,
+                    style: TextStyle(
+                      color: activeCount > 0
+                          ? PitchTheme.onSecondaryContainer
+                          : PitchTheme.outline,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                     ),
@@ -2772,15 +2792,10 @@ class _HomeScreenState extends State<HomeScreen>
         const SizedBox(height: 12),
 
         // Tournament Cards
-        if (tournaments.isNotEmpty)
-          ...tournaments.take(3).map((t) => _buildRealTournamentCard(t))
-        else ...[
-          _buildSampleTournament1(),
-          const SizedBox(height: 10),
-          _buildSampleTournament2(),
-          const SizedBox(height: 10),
-          _buildSampleTournament3(),
-        ],
+        if (userTournaments.isNotEmpty)
+          ...userTournaments.take(5).map((t) => _buildRealTournamentCard(t))
+        else
+          _buildEmptyTournamentsCard(),
       ],
     );
   }
@@ -2918,345 +2933,80 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildSampleTournament1() {
+  Widget _buildEmptyTournamentsCard() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
       decoration: BoxDecoration(
         color: PitchTheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: PitchTheme.outlineVariant.withValues(alpha: 0.4),
+        ),
         boxShadow: PitchTheme.cardShadow,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: PitchTheme.tertiaryFixed,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.emoji_events,
-                color: PitchTheme.primaryContainer,
-                size: 22,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Premier Cricket Cup 2026',
-                        style: TextStyle(
-                          color: PitchTheme.onSurface,
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: PitchTheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'R16',
-                        style: TextStyle(
-                          color: PitchTheme.tertiaryFixed,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                const Text(
-                  'Round of 16 • 12 Teams Active',
-                  style: TextStyle(
-                    color: PitchTheme.outline,
-                    fontSize: 11.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text(
-                      'Progress: 18/32 Matches',
-                      style: TextStyle(
-                        color: PitchTheme.onSurfaceVariant,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      '56%',
-                      style: TextStyle(
-                        color: PitchTheme.secondary,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: const LinearProgressIndicator(
-                    value: 0.56,
-                    backgroundColor: PitchTheme.surfaceContainer,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      PitchTheme.secondary,
-                    ),
-                    minHeight: 4,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: const [
-                    Icon(
-                      Icons.schedule,
-                      size: 13,
-                      color: PitchTheme.secondary,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      "Next: Today, 3:30 PM • St. John's Ground",
-                      style: TextStyle(
-                        color: PitchTheme.outline,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSampleTournament2() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: PitchTheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: PitchTheme.cardShadow,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
+            width: 46,
+            height: 46,
+            decoration: const BoxDecoration(
               color: PitchTheme.surfaceContainer,
-              borderRadius: BorderRadius.circular(10),
+              shape: BoxShape.circle,
             ),
             child: const Center(
               child: Icon(
-                Icons.workspace_premium,
+                Icons.emoji_events_outlined,
                 color: PitchTheme.secondary,
-                size: 22,
+                size: 24,
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Super 8s Grassroots Trophy',
-                        style: TextStyle(
-                          color: PitchTheme.onSurface,
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: PitchTheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'STAGE 3',
-                        style: TextStyle(
-                          color: PitchTheme.onSecondaryContainer,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                const Text(
-                  'Group Stage • Round 3 of 5',
-                  style: TextStyle(
-                    color: PitchTheme.outline,
-                    fontSize: 11.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: const [
-                    Icon(
-                      Icons.groups,
-                      size: 13,
-                      color: PitchTheme.secondary,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      '8 Teams',
-                      style: TextStyle(
-                        color: PitchTheme.onSurfaceVariant,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Text('•', style: TextStyle(color: PitchTheme.outline)),
-                    SizedBox(width: 10),
-                    Icon(
-                      Icons.leaderboard,
-                      size: 13,
-                      color: PitchTheme.secondary,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'Points Table Live',
-                      style: TextStyle(
-                        color: PitchTheme.secondary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          const SizedBox(height: 10),
+          const Text(
+            'No Tournaments Created Yet',
+            style: TextStyle(
+              color: PitchTheme.onSurface,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
             ),
+            textAlign: TextAlign.center,
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSampleTournament3() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: PitchTheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: PitchTheme.cardShadow,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: PitchTheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(10),
+          const SizedBox(height: 4),
+          const Text(
+            'Create your own tournament to manage teams, fixtures, and points table.',
+            style: TextStyle(
+              color: PitchTheme.outline,
+              fontSize: 11.5,
             ),
-            child: const Center(
-              child: Icon(
-                Icons.apartment,
-                color: PitchTheme.primaryContainer,
-                size: 22,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 14),
+          ElevatedButton.icon(
+            onPressed: () => _push(TournamentsScreen(store: store)),
+            icon: const Icon(
+              Icons.add,
+              size: 16,
+              color: PitchTheme.surfaceContainerLowest,
+            ),
+            label: const Text(
+              'Create Tournament',
+              style: TextStyle(
+                color: PitchTheme.surfaceContainerLowest,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Weekend Corporate Super League',
-                        style: TextStyle(
-                          color: PitchTheme.onSurface,
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: PitchTheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'KNOCKOUTS',
-                        style: TextStyle(
-                          color: PitchTheme.outline,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                const Text(
-                  'Semifinals this Saturday • Islamabad Club',
-                  style: TextStyle(
-                    color: PitchTheme.outline,
-                    fontSize: 11.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: () => _push(TournamentsScreen(store: store)),
-                  child: const Text(
-                    'View Brackets →',
-                    style: TextStyle(
-                      color: PitchTheme.secondary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
+            style: ElevatedButton.styleFrom(
+              backgroundColor: PitchTheme.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 10,
+              ),
+              elevation: 0,
             ),
           ),
         ],
@@ -3268,7 +3018,11 @@ class _HomeScreenState extends State<HomeScreen>
   // 7. SECTION 5: DIRECTORIES (Manage & Connect)
   // ---------------------------------------------------------------------------
   Widget _buildDirectoriesSection() {
-    final tourneyCount = store.tournaments.length;
+    final uid = store.effectiveUserId;
+    final tourneyCount = store.tournaments.where((t) {
+      if (t.creatorId.isEmpty) return true;
+      return uid.isNotEmpty && t.creatorId == uid;
+    }).length;
     final topTeam =
         store.teams.isNotEmpty ? store.teams.first.name : 'Islamabad E.';
 

@@ -92,7 +92,15 @@ class _LoginScreenState extends State<LoginScreen> {
             jerseyNumber: cu.jerseyNumber,
             city: cu.city,
           );
-          // Login only syncs user's own data, not entire global database
+          // Pull user's own cloud data (tournaments, matches, teams) in background
+          unawaited(() async {
+            try {
+              final client = CpanelApiClient();
+              await client.init();
+              final sync = CpanelSyncService(store: store, apiClient: client);
+              await sync.pullAndMerge();
+            } catch (_) {}
+          }());
         } else {
           final fu = _auth.currentUser;
           if (fu != null) {

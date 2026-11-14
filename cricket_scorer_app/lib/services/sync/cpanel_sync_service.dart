@@ -30,6 +30,12 @@ class CpanelSyncService {
     });
   }
 
+  /// Cancels any pending debounced auto-sync timer.
+  static void cancelDebounce() {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+  }
+
   Map<String, dynamic> _careerStatsToJson(CareerStats s) => {
         'matches': s.matches,
         'innings_batted': s.inningsBatted,

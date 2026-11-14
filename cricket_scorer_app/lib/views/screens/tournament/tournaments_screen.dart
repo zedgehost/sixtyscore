@@ -1,13 +1,16 @@
 import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
 // Tournaments list: view all tournaments, add new, edit names, delete.
 // Every tournament is user-created data — the app seeds nothing.
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
 import 'package:cricket_scorer_app/services/sync/publish_service.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/core/theme/theme.dart';
@@ -206,8 +209,16 @@ Future<Tournament?> showTournamentEditDialog(
       venue: venueCtrl.text.trim(),
       logoBase64: logoBase64,
       oversLimit: oversLimit,
+      creatorId: store.effectiveUserId,
     );
     await store.upsertTournament(t);
+    unawaited(() async {
+      try {
+        final client = CpanelApiClient();
+        await client.init();
+        CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+      } catch (_) {}
+    }());
     return t;
   }
   existing.name = nameCtrl.text.trim();
@@ -215,7 +226,17 @@ Future<Tournament?> showTournamentEditDialog(
   existing.logoBase64 = logoBase64;
   existing.oversLimit = oversLimit;
   existing.teamIds = selectedTeamIds;
+  if (existing.creatorId.isEmpty) {
+    existing.creatorId = store.effectiveUserId;
+  }
   await store.persistTournamentsOnly();
+  unawaited(() async {
+    try {
+      final client = CpanelApiClient();
+      await client.init();
+      CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+    } catch (_) {}
+  }());
   return existing;
 }
 
@@ -470,13 +491,24 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
     if (ok == true) {
       if (t.published) PublishService().deletePublishedDoc(t.id);
       await store.deleteTournament(t.id);
+      unawaited(() async {
+        try {
+          final client = CpanelApiClient();
+          await client.init();
+          CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+        } catch (_) {}
+      }());
       if (mounted) setState(() {});
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final tournaments = store.tournaments;
+    final uid = store.effectiveUserId;
+    final tournaments = store.tournaments.where((t) {
+      if (t.creatorId.isEmpty) return true;
+      return uid.isNotEmpty && t.creatorId == uid;
+    }).toList();
     final loggedIn = AuthService().isLoggedIn;
     return Scaffold(
       appBar: AppBar(
@@ -499,17 +531,38 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
         icon: const Icon(Icons.add),
         label: const Text('New tournament'),
       ),
-      body: tournaments.isEmpty
-          ? const Center(
-              child: Text(
-                'No tournaments yet.\nTap + to create one.',
-                textAlign: TextAlign.center,
-              ),
-            )
-          : ListView.builder(
-              itemCount: tournaments.length,
-              itemBuilder: (context, i) {
-                final t = tournaments[i];
+      body: RefreshIndicator(
+        color: PitchTheme.primary,
+        onRefresh: () async {
+          try {
+            final client = CpanelApiClient();
+            await client.init();
+            if (client.token != null && client.token!.isNotEmpty) {
+              await CpanelSyncService(store: store, apiClient: client).pullAndMerge();
+              if (mounted) setState(() {});
+            }
+          } catch (_) {}
+        },
+        child: tournaments.isEmpty
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.6,
+                    child: const Center(
+                      child: Text(
+                        'No tournaments yet.\nTap + to create one.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: tournaments.length,
+                itemBuilder: (context, i) {
+                  final t = tournaments[i];
                 final teamCount = t.teamIds.length;
                 final matchCount = store.matches
                     .where((m) => m.tournamentId == t.id)
@@ -536,6 +589,7 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                 );
               },
             ),
+      ),
     );
   }
 }
