@@ -7,7 +7,6 @@ import 'package:cricket_scorer_app/core/utils/nav_memory.dart';
 import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/core/theme/theme.dart';
-import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
 import 'package:cricket_scorer_app/services/share/fixture_poster.dart';
 import 'package:cricket_scorer_app/views/widgets/player_avatar.dart';
@@ -140,14 +139,14 @@ class _FixtureDetailScreenState extends State<FixtureDetailScreen> {
     if (ok != true || !mounted) return;
     m.status = 'cancelled';
     await store.upsertMatch(m);
-    CpanelSyncService(store: store, apiClient: CpanelApiClient()).triggerAutoSync();
+    CpanelSyncService.triggerAutoSyncFor(store);
     if (mounted) Navigator.pop(context, true);
   }
 
   Future<void> _reopenFixture(Match m) async {
     m.status = 'upcoming';
     await store.upsertMatch(m);
-    CpanelSyncService(store: store, apiClient: CpanelApiClient()).triggerAutoSync();
+    CpanelSyncService.triggerAutoSyncFor(store);
     _snack('Fixture reopened as upcoming');
     if (mounted) Navigator.pop(context, true);
   }
@@ -195,7 +194,7 @@ class _FixtureDetailScreenState extends State<FixtureDetailScreen> {
     );
     if (ok != true || !mounted) return;
     await store.deleteMatch(m.id);
-    CpanelSyncService(store: store, apiClient: CpanelApiClient()).triggerAutoSync();
+    CpanelSyncService.triggerAutoSyncFor(store);
     if (mounted) Navigator.pop(context, true);
   }
 

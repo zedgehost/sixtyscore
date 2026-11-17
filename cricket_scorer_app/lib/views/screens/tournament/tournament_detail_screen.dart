@@ -13,7 +13,6 @@ import 'package:cricket_scorer_app/core/utils/nav_memory.dart';
 import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/domain/tournament/tournament_engine.dart';
 import 'package:cricket_scorer_app/models/models.dart';
-import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/share/points_table_share.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
@@ -57,21 +56,29 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   @override
   void initState() {
     super.initState();
+    store.addListener(_onStoreChanged);
     NavMemory.save('tournament', tournament.id);
+    if (!tournament.published) {
+      tournament.published = true;
+      store.persistTournamentsOnly();
+      _triggerCloudSync();
+    }
     _runPlayoffUpdate();
   }
 
   @override
   void dispose() {
+    store.removeListener(_onStoreChanged);
     NavMemory.clear('tournament', tournament.id);
     super.dispose();
   }
 
+  void _onStoreChanged() {
+    if (mounted) setState(() {});
+  }
+
   void _triggerCloudSync() {
-    CpanelSyncService(
-      store: store,
-      apiClient: CpanelApiClient(),
-    ).triggerAutoSync();
+    CpanelSyncService.triggerAutoSyncFor(store);
   }
 
   Future<void> _runPlayoffUpdate() async {
@@ -92,29 +99,6 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       tournament.qualificationFinalized &&
       ((_playoffUpdate?.finalQualifiers ?? tournament.qualifiedTeamIds)
           .isNotEmpty);
-
-  Future<void> _togglePublish() async {
-    final wasPublished = tournament.published;
-    final svc = PublishService();
-    final err = wasPublished
-        ? await svc.unpublish(store, tournament)
-        : await svc.publish(store, tournament);
-
-    if (!mounted) return;
-    setState(() {});
-    _triggerCloudSync();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          err ??
-              (wasPublished
-                  ? 'Unpublished — it no longer appears in Search.'
-                  : 'Published — anyone can find it in Search (view-only).'),
-        ),
-      ),
-    );
-  }
 
   Future<void> _editTournamentDetails() async {
     final updated = await showTournamentEditDialog(context, store, tournament);
@@ -177,38 +161,406 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   Future<void> _openFixture(Match m) async {
+    final hasWinnerResult = m.resultText.isNotEmpty && m.status != 'noResult';
+    final hasBothInningsDone = m.innings.length >= 2 && m.innings[1].isComplete;
+    final isMatchCompleted = m.status == 'completed' || hasWinnerResult || hasBothInningsDone;
+
+    if (isMatchCompleted && m.status != 'completed') {
+      m.status = 'completed';
+      if (m.resultText.isEmpty) {
+        final res = computeResult(m, store.teamName);
+        if (res.isNotEmpty) m.resultText = res;
+      }
+      await store.persistMatchesOnly();
+      _triggerCloudSync();
+    }
+
     late final Widget screen;
     final canScore = !AuthService().isRestrictedGuest &&
         m.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode);
 
-    switch (m.status) {
-      case 'live':
-        screen = canScore
-            ? ScoringScreen(store: store, match: m)
-            : ScorecardScreen(store: store, match: m);
-        break;
-      case 'completed':
-        screen = ScorecardScreen(store: store, match: m);
-        break;
-      default:
-        screen = FixtureDetailScreen(store: store, matchId: m.id);
+    if (isMatchCompleted) {
+      screen = ScorecardScreen(store: store, match: m);
+    } else if (m.status == 'live') {
+      screen = canScore
+          ? ScoringScreen(store: store, match: m)
+          : ScorecardScreen(store: store, match: m);
+    } else {
+      screen = FixtureDetailScreen(store: store, matchId: m.id);
     }
 
+    if (!mounted) return;
     await Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
     if (!mounted) return;
     setState(() {});
     await _runPlayoffUpdate();
   }
 
+  Future<void> _showEditFixtureDialog(Match m) async {
+    DateTime selectedDate;
+    TimeOfDay selectedTime;
+    try {
+      if (m.dateIso.contains('T')) {
+        final dt = DateTime.parse(m.dateIso);
+        selectedDate = DateTime(dt.year, dt.month, dt.day);
+        selectedTime = TimeOfDay(hour: dt.hour, minute: dt.minute);
+      } else if (m.dateIso.isNotEmpty) {
+        final dt = DateTime.parse(m.dateIso);
+        selectedDate = DateTime(dt.year, dt.month, dt.day);
+        selectedTime = const TimeOfDay(hour: 14, minute: 0);
+      } else {
+        selectedDate = DateTime.now();
+        selectedTime = const TimeOfDay(hour: 14, minute: 0);
+      }
+    } catch (_) {
+      selectedDate = DateTime.now();
+      selectedTime = const TimeOfDay(hour: 14, minute: 0);
+    }
+
+    final venueCtrl = TextEditingController(text: m.venue.isNotEmpty ? m.venue : tournament.venue);
+    final titleCtrl = TextEditingController(text: m.matchTitle);
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, setD) {
+          final formattedCurrent = formatFixtureDate(
+            '${selectedDate.year.toString().padLeft(4, '0')}-'
+            '${selectedDate.month.toString().padLeft(2, '0')}-'
+            '${selectedDate.day.toString().padLeft(2, '0')}T'
+            '${selectedTime.hour.toString().padLeft(2, '0')}:'
+            '${selectedTime.minute.toString().padLeft(2, '0')}:00',
+          );
+
+          return AlertDialog(
+            backgroundColor: PitchTheme.surfaceContainerLowest,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.edit_calendar, color: PitchTheme.primary, size: 22),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Edit Fixture Schedule',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${store.teamName(m.teamAId)} vs ${store.teamName(m.teamBId)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: PitchTheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Match Title (optional)
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Match Title / Label',
+                      hintText: 'e.g. Match 1, League Match, Final',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Date & Time Picker Tile
+                  const Text(
+                    'Scheduled Date & Time',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: PitchTheme.outline),
+                  ),
+                  const SizedBox(height: 6),
+                  InkWell(
+                    onTap: () async {
+                      final pickedDate = await showDatePicker(
+                        context: c,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2035),
+                      );
+                      if (pickedDate == null) return;
+
+                      if (!c.mounted) return;
+                      final pickedTime = await showTimePicker(
+                        context: c,
+                        initialTime: selectedTime,
+                      );
+                      if (pickedTime == null) return;
+
+                      setD(() {
+                        selectedDate = pickedDate;
+                        selectedTime = pickedTime;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: PitchTheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: PitchTheme.outlineVariant),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today, size: 18, color: PitchTheme.primary),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              formattedCurrent,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_drop_down, color: PitchTheme.outline),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Venue
+                  TextField(
+                    controller: venueCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Ground / Venue',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      prefixIcon: Icon(Icons.location_on_outlined, size: 20),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('Cancel', style: TextStyle(color: PitchTheme.outline)),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: PitchTheme.primary),
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('Save Changes'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (saved == true) {
+      final iso =
+          '${selectedDate.year.toString().padLeft(4, '0')}-'
+          '${selectedDate.month.toString().padLeft(2, '0')}-'
+          '${selectedDate.day.toString().padLeft(2, '0')}T'
+          '${selectedTime.hour.toString().padLeft(2, '0')}:'
+          '${selectedTime.minute.toString().padLeft(2, '0')}:00';
+
+      m.dateIso = iso;
+      m.venue = venueCtrl.text.trim();
+      if (titleCtrl.text.trim().isNotEmpty) {
+        m.matchTitle = titleCtrl.text.trim();
+      }
+
+      await store.persistMatchesOnly();
+      _triggerCloudSync();
+
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Fixture schedule updated successfully!')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showEndMatchDialog(Match m) async {
+    final teamAName = store.teamName(m.teamAId);
+    final teamBName = store.teamName(m.teamBId);
+    final autoResult = computeResult(m, store.teamName);
+
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: PitchTheme.surfaceContainerLowest,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.emoji_events, color: PitchTheme.secondary, size: 22),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'End Match & Declare Result',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Select how this match concludes. This will mark the match as completed and update the tournament standings.',
+              style: TextStyle(fontSize: 12.5, color: PitchTheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 14),
+            if (autoResult.isNotEmpty)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.auto_awesome, color: PitchTheme.secondary),
+                title: Text(autoResult, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                subtitle: const Text('Calculated from current innings scores'),
+                onTap: () => Navigator.pop(c, 'auto'),
+              ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.check_circle_outline, color: PitchTheme.primary),
+              title: Text('$teamAName Won', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+              subtitle: const Text('Opponent conceded / forfeited'),
+              onTap: () => Navigator.pop(c, 'teamA'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.check_circle_outline, color: PitchTheme.primary),
+              title: Text('$teamBName Won', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+              subtitle: const Text('Opponent conceded / forfeited'),
+              onTap: () => Navigator.pop(c, 'teamB'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.handshake_outlined, color: PitchTheme.outline),
+              title: const Text('Match Tied', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+              subtitle: const Text('Scores level / mutually agreed tie'),
+              onTap: () => Navigator.pop(c, 'tie'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Cancel', style: TextStyle(color: PitchTheme.outline)),
+          ),
+        ],
+      ),
+    );
+
+    if (selected != null) {
+      if (selected == 'auto' && autoResult.isNotEmpty) {
+        m.resultText = autoResult;
+      } else if (selected == 'teamA') {
+        m.resultText = '$teamAName won by forfeit';
+      } else if (selected == 'teamB') {
+        m.resultText = '$teamBName won by forfeit';
+      } else if (selected == 'tie') {
+        m.resultText = 'Match tied';
+      }
+      m.status = 'completed';
+      await store.persistMatchesOnly();
+      _triggerCloudSync();
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Match marked completed: ${m.resultText}')),
+        );
+      }
+      await _runPlayoffUpdate();
+    }
+  }
+
+  Future<void> _resetMatchToUpcoming(Match m) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: PitchTheme.surfaceContainerLowest,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Reset to Upcoming?', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text(
+          'This will clear unbowled innings and return the fixture to UPCOMING status.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel', style: TextStyle(color: PitchTheme.outline)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: PitchTheme.primary),
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      m.status = 'upcoming';
+      m.innings = [];
+      m.superOverInnings = [];
+      m.resultText = '';
+      m.tossWinnerId = '';
+      m.tossDecision = 'bat';
+      await store.persistMatchesOnly();
+      _triggerCloudSync();
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Match reset to Upcoming!')),
+        );
+      }
+    }
+  }
+
+  Future<void> _markMatchNoResult(Match m) async {
+    m.status = 'noResult';
+    m.resultText = 'No result';
+    await store.persistMatchesOnly();
+    _triggerCloudSync();
+    if (mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Match marked as No Result.')),
+      );
+    }
+    await _runPlayoffUpdate();
+  }
+
   Widget _fixtureCard(Match m, {String? stageOverride}) {
+    final hasWinnerResult = m.resultText.isNotEmpty && m.status != 'noResult';
+    final hasBothInningsDone = m.innings.length >= 2 && m.innings[1].isComplete;
+    final isMatchCompleted = m.status == 'completed' || hasWinnerResult || hasBothInningsDone;
+
+    if (isMatchCompleted && m.status != 'completed') {
+      m.status = 'completed';
+      if (m.resultText.isEmpty) {
+        final res = computeResult(m, store.teamName);
+        if (res.isNotEmpty) m.resultText = res;
+      }
+      store.persistMatchesOnly();
+    }
+    final effectiveStatus = isMatchCompleted ? 'completed' : m.status;
+
     final title = m.matchTitle.isNotEmpty
         ? m.matchTitle
         : (stageOverride ?? 'League Fixture');
 
     final subtitle = m.resultText.isNotEmpty
         ? m.resultText
-        : '${formatFixtureDate(m.dateIso)}'
-            '${m.venue.isNotEmpty ? ' · ${m.venue}' : ''}';
+        : (effectiveStatus == 'live'
+            ? (m.innings.length >= 2
+                ? 'Target: ${m.innings[1].target} runs · In Progress'
+                : (m.innings.isNotEmpty
+                    ? '1st Innings in progress'
+                    : 'Match Live · Tap to score'))
+            : '${formatFixtureDate(m.dateIso)}${m.venue.isNotEmpty ? ' · ${m.venue}' : ''}');
 
     final teamAName = store.teamName(m.teamAId);
     final teamBName = store.teamName(m.teamBId);
@@ -216,7 +568,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     // Live or completed score summaries if match has innings
     String? teamAScoreText;
     String? teamBScoreText;
-    if (m.status == 'live' || m.status == 'completed') {
+    if (m.status == 'live' || effectiveStatus == 'completed') {
       if (m.innings.isNotEmpty) {
         final inn1 = m.innings[0];
         final inn1TeamId = inn1.battingTeamId;
@@ -238,6 +590,15 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
         } else {
           teamBScoreText = scoreStr;
         }
+      }
+      // If live and one team hasn't batted yet, show "Yet to bat" or "0/0 (0.0)"
+      if (m.status == 'live') {
+        teamAScoreText ??= m.innings.isEmpty
+            ? '0/0 (0.0)'
+            : (m.innings.length == 1 ? 'Yet to bat' : '0/0 (0.0)');
+        teamBScoreText ??= m.innings.isEmpty
+            ? '0/0 (0.0)'
+            : (m.innings.length == 1 ? 'Yet to bat' : '0/0 (0.0)');
       }
     }
 
@@ -265,7 +626,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Stage title and Status badge
+                // Stage title, Status badge, and Edit button
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -283,7 +644,135 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _buildMatchStatusPill(m.status),
+                    _buildMatchStatusPill(effectiveStatus),
+                    const SizedBox(width: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_calendar_outlined, size: 18),
+                          color: PitchTheme.outline,
+                          tooltip: 'Edit fixture schedule & venue',
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(4),
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onPressed: () => _showEditFixtureDialog(m),
+                        ),
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert, size: 18, color: PitchTheme.outline),
+                          tooltip: 'Match options',
+                          padding: const EdgeInsets.all(4),
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onSelected: (action) async {
+                            if (action == 'edit_schedule') {
+                              _showEditFixtureDialog(m);
+                            } else if (action == 'resume_score') {
+                              _openFixture(m);
+                            } else if (action == 'view_scorecard') {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ScorecardScreen(store: store, match: m),
+                                ),
+                              );
+                            } else if (action == 'end_match') {
+                              _showEndMatchDialog(m);
+                            } else if (action == 'reset_upcoming') {
+                              _resetMatchToUpcoming(m);
+                            } else if (action == 'no_result') {
+                              _markMatchNoResult(m);
+                            }
+                          },
+                          itemBuilder: (ctx) => [
+                            const PopupMenuItem(
+                              value: 'edit_schedule',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit_calendar_outlined, size: 17, color: PitchTheme.outline),
+                                  SizedBox(width: 8),
+                                  Text('Edit Schedule & Venue'),
+                                ],
+                              ),
+                            ),
+                            if (effectiveStatus == 'live') ...[
+                              const PopupMenuItem(
+                                value: 'resume_score',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.sports_cricket, size: 17, color: PitchTheme.primary),
+                                    SizedBox(width: 8),
+                                    Text('Resume Scoring'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'view_scorecard',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.table_chart_outlined, size: 17, color: PitchTheme.outline),
+                                    SizedBox(width: 8),
+                                    Text('View Scorecard'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'end_match',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.emoji_events_outlined, size: 17, color: PitchTheme.secondary),
+                                    SizedBox(width: 8),
+                                    Text('End / Concede Match'),
+                                  ],
+                                ),
+                              ),
+                              if (m.innings.isEmpty || m.innings.every((i) => i.legalBalls == 0))
+                                const PopupMenuItem(
+                                  value: 'reset_upcoming',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.restart_alt, size: 17, color: PitchTheme.outline),
+                                      SizedBox(width: 8),
+                                      Text('Reset to Upcoming'),
+                                    ],
+                                  ),
+                                ),
+                              const PopupMenuItem(
+                                value: 'no_result',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.block, size: 17, color: PitchTheme.error),
+                                    SizedBox(width: 8),
+                                    Text('Declare No Result'),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            if (effectiveStatus == 'completed') ...[
+                              const PopupMenuItem(
+                                value: 'view_scorecard',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.table_chart_outlined, size: 17, color: PitchTheme.outline),
+                                    SizedBox(width: 8),
+                                    Text('View Scorecard'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'resume_score',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit, size: 17, color: PitchTheme.primary),
+                                    SizedBox(width: 8),
+                                    Text('Reopen for Scoring'),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -407,6 +896,15 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (effectiveStatus != 'completed')
+                        InkWell(
+                          onTap: () => _showEditFixtureDialog(m),
+                          borderRadius: BorderRadius.circular(4),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            child: Icon(Icons.edit_outlined, size: 14, color: PitchTheme.outline),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -528,9 +1026,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       }
     }
 
-    var overs = tournament.oversLimit;
+    final overs = tournament.oversLimit;
     var doubleRoundRobin = false;
-    var ballType = tournament.ballType.isNotEmpty ? tournament.ballType : 'Tennis Ball';
+    final ballType = tournament.ballType.isNotEmpty ? tournament.ballType : 'Tennis Ball';
 
     if (!mounted) return;
 
@@ -547,54 +1045,65 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: PitchTheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
                   ),
-                  child: Row(
+                  child: Column(
                     children: [
-                      const Icon(Icons.groups, size: 18, color: PitchTheme.secondary),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Participating Teams: ${teamIds.length}',
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                      Row(
+                        children: [
+                          const Icon(Icons.groups, size: 18, color: PitchTheme.secondary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Participating Teams: ${teamIds.length}',
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 16),
+                      Row(
+                        children: [
+                          const Icon(Icons.timelapse_outlined, size: 18, color: PitchTheme.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '$overs Overs per innings (from tournament)',
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(Icons.sports_baseball_outlined, size: 18, color: PitchTheme.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '$ballType (from tournament)',
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<int>(
-                  initialValue: overs,
-                  decoration: const InputDecoration(
-                    labelText: 'Overs per innings',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [5, 6, 8, 10, 12, 15, 20, 50]
-                      .map((o) => DropdownMenuItem(value: o, child: Text('$o overs')))
-                      .toList(),
-                  onChanged: (v) => setD(() => overs = v ?? 8),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue: ballType,
-                  decoration: const InputDecoration(
-                    labelText: 'Ball type',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'Tennis Ball', child: Text('Tennis Ball')),
-                    DropdownMenuItem(value: 'Leather Ball', child: Text('Leather Ball')),
-                    DropdownMenuItem(value: 'Tape Ball', child: Text('Tape Ball')),
-                  ],
-                  onChanged: (v) => setD(() => ballType = v ?? 'Tennis Ball'),
                 ),
                 const SizedBox(height: 14),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text(
                     'Home & Away (Double Round-Robin)',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                  ),
+                  subtitle: const Text(
+                    'Each team plays against each other twice',
+                    style: TextStyle(fontSize: 11.5, color: PitchTheme.outline),
                   ),
                   value: doubleRoundRobin,
                   activeThumbColor: PitchTheme.secondary,
@@ -626,6 +1135,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       oversLimit: overs,
       ballType: ballType,
       doubleRoundRobin: doubleRoundRobin,
+      creatorId: store.effectiveUserId,
+      creatorName: store.profile?.displayName ?? '',
+      creatorCode: store.effectiveUserCode,
     );
 
     for (final f in fixtures) {
@@ -672,8 +1184,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     }
 
     var playoffFormat = 'semis';
-    var overs = tournament.oversLimit;
-    var ballType = tournament.ballType.isNotEmpty ? tournament.ballType : 'Tennis Ball';
+    final overs = tournament.oversLimit;
+    final ballType = tournament.ballType.isNotEmpty ? tournament.ballType : 'Tennis Ball';
 
     if (!mounted) return;
 
@@ -766,31 +1278,30 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                       ),
                     ),
                   ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  initialValue: overs,
-                  decoration: const InputDecoration(
-                    labelText: 'Overs per innings',
-                    border: OutlineInputBorder(),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: PitchTheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
                   ),
-                  items: [5, 6, 8, 10, 12, 15, 20, 50]
-                      .map((o) => DropdownMenuItem(value: o, child: Text('$o overs')))
-                      .toList(),
-                  onChanged: (v) => setD(() => overs = v ?? 8),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: ballType,
-                  decoration: const InputDecoration(
-                    labelText: 'Ball type',
-                    border: OutlineInputBorder(),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 16, color: PitchTheme.outline),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Matches: $overs Overs · $ballType (from tournament specs)',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: PitchTheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'Tennis Ball', child: Text('Tennis Ball')),
-                    DropdownMenuItem(value: 'Leather Ball', child: Text('Leather Ball')),
-                    DropdownMenuItem(value: 'Tape Ball', child: Text('Tape Ball')),
-                  ],
-                  onChanged: (v) => setD(() => ballType = v ?? 'Tennis Ball'),
                 ),
               ],
             ),
@@ -866,6 +1377,21 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Reconcile completed status for all tournament fixtures before computing standings
+    for (final m in store.matches) {
+      if (m.tournamentId == tournament.id) {
+        final hasWinnerResult = m.resultText.isNotEmpty && m.status != 'noResult';
+        final hasBothInningsDone = m.innings.length >= 2 && m.innings[1].isComplete;
+        if ((hasWinnerResult || hasBothInningsDone) && m.status != 'completed') {
+          m.status = 'completed';
+          if (m.resultText.isEmpty) {
+            final res = computeResult(m, store.teamName);
+            if (res.isNotEmpty) m.resultText = res;
+          }
+        }
+      }
+    }
+
     final rows = leaguePointsTable(tournament, store.matches);
     final qualifierIds = _qualifierIds;
 
@@ -897,17 +1423,6 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             ),
           ),
           actions: [
-            if (AuthService().isLoggedIn)
-              IconButton(
-                icon: Icon(
-                  tournament.published ? Icons.public : Icons.public_off,
-                  color: tournament.published ? PitchTheme.secondary : PitchTheme.outline,
-                ),
-                tooltip: tournament.published
-                    ? 'Published — tap to unpublish'
-                    : 'Publish (public, view-only)',
-                onPressed: _togglePublish,
-              ),
             IconButton(
               icon: const Icon(Icons.groups_outlined, color: PitchTheme.onSurface),
               tooltip: 'Tournament Draft',
@@ -985,32 +1500,22 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
-        body: Column(
+        body: TabBarView(
           children: [
-            // Tournament Hero Header Banner
-            _buildTournamentHeroBanner(),
+            // Tab 1: Fixtures (hero banner is exclusively in this tab)
+            _buildFixturesTab(leagueFixtures, playoffFixtures),
 
-            // Tab Bar View
-            Expanded(
-              child: TabBarView(
-                children: [
-                  // Tab 1: Fixtures
-                  _buildFixturesTab(leagueFixtures, playoffFixtures),
+            // Tab 2: Points Table
+            _buildPointsTableTab(rows, qualifierIds),
 
-                  // Tab 2: Points Table
-                  _buildPointsTableTab(rows, qualifierIds),
+            // Tab 3: Teams & Squads
+            _buildTeamsTab(),
 
-                  // Tab 3: Teams & Squads
-                  _buildTeamsTab(),
+            // Tab 4: Leaderboard Stats
+            TournamentStatsTab(store: store, tournament: tournament),
 
-                  // Tab 4: Leaderboard Stats
-                  TournamentStatsTab(store: store, tournament: tournament),
-
-                  // Tab 5: Overview & Specifications
-                  _buildOverviewTab(leagueFixtures, playoffFixtures),
-                ],
-              ),
-            ),
+            // Tab 5: Overview & Specifications
+            _buildOverviewTab(leagueFixtures, playoffFixtures),
           ],
         ),
       ),
@@ -1190,183 +1695,195 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   Widget _buildFixturesTab(List<Match> leagueFixtures, List<Match> playoffFixtures) {
     return ListView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 90),
+      padding: const EdgeInsets.only(bottom: 90),
       children: [
-        // Section: League Fixtures
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                const Text(
-                  'League Fixtures',
-                  style: TextStyle(
-                    color: PitchTheme.onSurface,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
+        // Tournament Hero Header Banner (displayed exclusively on Fixtures tab)
+        _buildTournamentHeroBanner(),
+        const SizedBox(height: 14),
+
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Section: League Fixtures
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        'League Fixtures',
+                        style: TextStyle(
+                          color: PitchTheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: PitchTheme.surfaceContainer,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${leagueFixtures.length}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: PitchTheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: PitchTheme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '${leagueFixtures.length}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: PitchTheme.primary,
+                  TextButton.icon(
+                    icon: const Icon(Icons.auto_mode, size: 16, color: PitchTheme.secondary),
+                    label: const Text(
+                      'Auto Fixtures',
+                      style: TextStyle(color: PitchTheme.secondary, fontWeight: FontWeight.w700),
                     ),
+                    onPressed: () => _generateScheduleDialog(),
                   ),
-                ),
-              ],
-            ),
-            TextButton.icon(
-              icon: const Icon(Icons.auto_mode, size: 16, color: PitchTheme.secondary),
-              label: const Text(
-                'Auto Fixtures',
-                style: TextStyle(color: PitchTheme.secondary, fontWeight: FontWeight.w700),
+                ],
               ),
-              onPressed: () => _generateScheduleDialog(),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-        if (leagueFixtures.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(20),
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: PitchTheme.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
-            ),
-            child: Column(
-              children: [
-                const Icon(Icons.event_note, size: 40, color: PitchTheme.outline),
-                const SizedBox(height: 8),
-                const Text(
-                  'No league fixtures yet',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14.5,
-                    color: PitchTheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Generate a full round-robin schedule or add fixtures manually.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: PitchTheme.outline),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: PitchTheme.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  icon: const Icon(Icons.auto_mode, size: 16),
-                  label: const Text('Generate Round-Robin Schedule'),
-                  onPressed: () => _generateScheduleDialog(),
-                ),
-              ],
-            ),
-          ),
-
-        for (final m in leagueFixtures) _fixtureCard(m),
-
-        const SizedBox(height: 12),
-
-        // Section: Playoffs
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                const Text(
-                  'Knockouts & Playoffs',
-                  style: TextStyle(
-                    color: PitchTheme.onSurface,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(width: 8),
+              if (leagueFixtures.isEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding: const EdgeInsets.all(20),
+                  margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: PitchTheme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(10),
+                    color: PitchTheme.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
                   ),
-                  child: Text(
-                    '${playoffFixtures.length}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: PitchTheme.primary,
+                  child: Column(
+                    children: [
+                      const Icon(Icons.event_note, size: 40, color: PitchTheme.outline),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'No league fixtures yet',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14.5,
+                          color: PitchTheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Generate a full round-robin schedule or add fixtures manually.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: PitchTheme.outline),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: PitchTheme.primary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.auto_mode, size: 16),
+                        label: const Text('Generate Round-Robin Schedule'),
+                        onPressed: () => _generateScheduleDialog(),
+                      ),
+                    ],
+                  ),
+                ),
+
+              for (final m in leagueFixtures) _fixtureCard(m),
+
+              const SizedBox(height: 12),
+
+              // Section: Playoffs
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        'Knockouts & Playoffs',
+                        style: TextStyle(
+                          color: PitchTheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: PitchTheme.surfaceContainer,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${playoffFixtures.length}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: PitchTheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.emoji_events_outlined, size: 16, color: PitchTheme.secondary),
+                    label: const Text(
+                      'Auto Knockouts',
+                      style: TextStyle(color: PitchTheme.secondary, fontWeight: FontWeight.w700),
                     ),
+                    onPressed: () => _generatePlayoffsDialog(),
                   ),
-                ),
-              ],
-            ),
-            TextButton.icon(
-              icon: const Icon(Icons.emoji_events_outlined, size: 16, color: PitchTheme.secondary),
-              label: const Text(
-                'Auto Knockouts',
-                style: TextStyle(color: PitchTheme.secondary, fontWeight: FontWeight.w700),
+                ],
               ),
-              onPressed: () => _generatePlayoffsDialog(),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-        if (playoffFixtures.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: PitchTheme.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
-            ),
-            child: Column(
-              children: [
-                const Icon(Icons.emoji_events_outlined, size: 40, color: PitchTheme.outline),
-                const SizedBox(height: 8),
-                const Text(
-                  'No playoff fixtures setup',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14.5,
-                    color: PitchTheme.onSurface,
+              if (playoffFixtures.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: PitchTheme.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.emoji_events_outlined, size: 40, color: PitchTheme.outline),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'No playoff fixtures setup',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14.5,
+                          color: PitchTheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Setup Semifinals, Grand Final, or IPL-style Page playoffs.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: PitchTheme.outline),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: PitchTheme.primary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.emoji_events_outlined, size: 16),
+                        label: const Text('Setup Knockouts / Playoffs'),
+                        onPressed: () => _generatePlayoffsDialog(),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Setup Semifinals, Grand Final, or IPL-style Page playoffs.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: PitchTheme.outline),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: PitchTheme.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  icon: const Icon(Icons.emoji_events_outlined, size: 16),
-                  label: const Text('Setup Knockouts / Playoffs'),
-                  onPressed: () => _generatePlayoffsDialog(),
-                ),
-              ],
-            ),
+
+              for (final m in playoffFixtures)
+                _fixtureCard(m, stageOverride: stageLabel(m.stage)),
+            ],
           ),
-
-        for (final m in playoffFixtures)
-          _fixtureCard(m, stageOverride: stageLabel(m.stage)),
+        ),
       ],
     );
   }
@@ -1376,230 +1893,150 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 90),
       children: [
-        // Action tools row
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: Row(
-            children: [
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: PitchTheme.primary,
-                  side: const BorderSide(color: PitchTheme.outlineVariant),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                icon: const Icon(Icons.calculate_outlined, size: 18),
-                label: const Text('Qualification Scenarios', style: TextStyle(fontWeight: FontWeight.w700)),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => QualificationChancesScreen(
-                      store: store,
-                      initialTournamentId: tournament.id,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: PitchTheme.primary,
-                  side: const BorderSide(color: PitchTheme.outlineVariant),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                icon: const Icon(Icons.functions_outlined, size: 18),
-                label: const Text('NRR Calculator', style: TextStyle(fontWeight: FontWeight.w700)),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => NrrCalculatorScreen(
-                      store: store,
-                      initialTournamentId: tournament.id,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // Qualifier notification badge
-        if (qualifierIds.isNotEmpty)
+        if (rows.isEmpty)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
-              color: PitchTheme.secondaryContainer.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: PitchTheme.secondary.withValues(alpha: 0.3)),
+              color: PitchTheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.6)),
             ),
-            child: Row(
+            child: const Column(
               children: [
-                _qualificationFinal ? const QBadge() : const QBadge(provisional: true),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _qualificationFinal
-                        ? 'Official Qualifiers confirmed for playoffs'
-                        : 'Q* = provisional qualification (mathematically guaranteed)',
-                    style: const TextStyle(
-                      color: PitchTheme.onSecondaryContainer,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
+                Icon(Icons.table_chart_outlined, size: 40, color: PitchTheme.outline),
+                SizedBox(height: 10),
+                Text(
+                  'Points Table Empty',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: PitchTheme.onSurface,
                   ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Enroll teams and record matches to see standings.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: PitchTheme.outline),
                 ),
               ],
             ),
-          ),
-
-        // Standings Data Table Container
-        Container(
-          decoration: BoxDecoration(
-            color: PitchTheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.6)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: DataTable(
-                headingRowColor: WidgetStateProperty.all(PitchTheme.surfaceContainerLow),
-                columnSpacing: 14,
-                headingTextStyle: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
-                  color: PitchTheme.onSurface,
-                  letterSpacing: 0.4,
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: PitchTheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.6)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
-                dataTextStyle: const TextStyle(
-                  fontSize: 13,
-                  color: PitchTheme.onSurface,
-                  fontWeight: FontWeight.w500,
-                ),
-                columns: const [
-                  DataColumn(label: Text('#')),
-                  DataColumn(label: Text('TEAM')),
-                  DataColumn(label: Text('P')),
-                  DataColumn(label: Text('W')),
-                  DataColumn(label: Text('L')),
-                  DataColumn(label: Text('T')),
-                  DataColumn(label: Text('NR')),
-                  DataColumn(label: Text('PTS')),
-                  DataColumn(label: Text('NRR')),
-                  DataColumn(label: Text('EDIT')),
-                ],
-                rows: [
-                  for (var i = 0; i < rows.length; i++)
-                    DataRow(
-                      color: qualifierIds.contains(rows[i].teamId)
-                          ? WidgetStateProperty.all(
-                              PitchTheme.secondaryContainer.withValues(alpha: 0.2),
-                            )
-                          : null,
-                      cells: [
-                        DataCell(
-                          Text(
-                            '${i + 1}',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                        DataCell(
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              CaptainAvatar(store: store, teamId: rows[i].teamId),
-                              const SizedBox(width: 8),
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 140),
-                                child: Text(
-                                  store.teamName(rows[i].teamId),
-                                  style: const TextStyle(fontWeight: FontWeight.w700),
-                                  overflow: TextOverflow.ellipsis,
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(PitchTheme.surfaceContainerLow),
+                  columnSpacing: 16,
+                  headingTextStyle: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    color: PitchTheme.onSurface,
+                    letterSpacing: 0.4,
+                  ),
+                  dataTextStyle: const TextStyle(
+                    fontSize: 13,
+                    color: PitchTheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  columns: const [
+                    DataColumn(label: Text('TEAM')),
+                    DataColumn(label: Text('P')),
+                    DataColumn(label: Text('W')),
+                    DataColumn(label: Text('L')),
+                    DataColumn(label: Text('T')),
+                    DataColumn(label: Text('PTS')),
+                    DataColumn(label: Text('RUN RATE')),
+                  ],
+                  rows: [
+                    for (var i = 0; i < rows.length; i++)
+                      DataRow(
+                        color: qualifierIds.contains(rows[i].teamId)
+                            ? WidgetStateProperty.all(
+                                PitchTheme.secondaryContainer.withValues(alpha: 0.2),
+                              )
+                            : null,
+                        cells: [
+                          DataCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                CaptainAvatar(store: store, teamId: rows[i].teamId),
+                                const SizedBox(width: 8),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 140),
+                                  child: Text(
+                                    store.teamName(rows[i].teamId),
+                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              ),
-                              if (qualifierIds.contains(rows[i].teamId)) ...[
-                                const SizedBox(width: 6),
-                                _qualificationFinal
-                                    ? const QBadge()
-                                    : const QBadge(provisional: true),
+                                if (qualifierIds.contains(rows[i].teamId)) ...[
+                                  const SizedBox(width: 6),
+                                  _qualificationFinal
+                                      ? const QBadge()
+                                      : const QBadge(provisional: true),
+                                ],
+                                if (tournament.pointsTableOverrides.containsKey(rows[i].teamId)) ...[
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.edit, size: 14, color: Colors.amber),
+                                ],
                               ],
-                              if (tournament.pointsTableOverrides.containsKey(rows[i].teamId)) ...[
-                                const SizedBox(width: 6),
-                                const Icon(Icons.edit, size: 14, color: Colors.amber),
-                              ],
-                            ],
-                          ),
-                          onTap: () => _editPointsRow(rows[i]),
-                        ),
-                        DataCell(Text('${rows[i].played}')),
-                        DataCell(Text('${rows[i].won}')),
-                        DataCell(Text('${rows[i].lost}')),
-                        DataCell(Text('${rows[i].tied}')),
-                        DataCell(Text('${rows[i].noResult}')),
-                        DataCell(
-                          Text(
-                            '${rows[i].points}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              color: PitchTheme.secondary,
-                              fontSize: 14,
                             ),
+                            onTap: () => _editPointsRow(rows[i]),
                           ),
-                        ),
-                        DataCell(
-                          Text(
-                            rows[i].nrr >= 0
-                                ? '+${rows[i].nrr.toStringAsFixed(3)}'
-                                : rows[i].nrr.toStringAsFixed(3),
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: rows[i].nrr >= 0
-                                  ? PitchTheme.secondary
-                                  : PitchTheme.error,
+                          DataCell(Text('${rows[i].played}'), onTap: () => _editPointsRow(rows[i])),
+                          DataCell(Text('${rows[i].won}'), onTap: () => _editPointsRow(rows[i])),
+                          DataCell(Text('${rows[i].lost}'), onTap: () => _editPointsRow(rows[i])),
+                          DataCell(Text('${rows[i].tied}'), onTap: () => _editPointsRow(rows[i])),
+                          DataCell(
+                            Text(
+                              '${rows[i].points}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: PitchTheme.secondary,
+                                fontSize: 14,
+                              ),
                             ),
+                            onTap: () => _editPointsRow(rows[i]),
                           ),
-                        ),
-                        DataCell(
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit_note_outlined, size: 20),
-                                tooltip: 'Edit points row',
-                                onPressed: () => _editPointsRow(rows[i]),
+                          DataCell(
+                            Text(
+                              rows[i].nrr >= 0
+                                  ? '+${rows[i].nrr.toStringAsFixed(3)}'
+                                  : rows[i].nrr.toStringAsFixed(3),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: rows[i].nrr >= 0
+                                    ? PitchTheme.secondary
+                                    : PitchTheme.error,
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.tune_outlined, size: 18),
-                                tooltip: 'Custom points adjustment',
-                                onPressed: () => _editAdjustment(rows[i].teamId),
-                              ),
-                            ],
+                            ),
+                            onTap: () => _editPointsRow(rows[i]),
                           ),
-                        ),
-                      ],
-                    ),
-                ],
+                        ],
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-
-        const SizedBox(height: 12),
-        const Text(
-          'NRR calculated according to ICC rules: Aggregate runs per over scored minus conceded across the tournament. Bowled out teams count as having faced full overs.',
-          style: TextStyle(fontSize: 11.5, color: PitchTheme.outline),
-        ),
       ],
     );
   }
@@ -1646,6 +2083,13 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             ),
           ),
           actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(c, null);
+                _editAdjustment(teamId);
+              },
+              child: const Text('Custom Adjustment', style: TextStyle(color: PitchTheme.secondary)),
+            ),
             if (existing != null)
               TextButton(
                 onPressed: () => Navigator.pop(c, 'reset'),
@@ -1849,9 +2293,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 90),
       children: [
-        // Action Header
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        // Action Header - Responsive zero-overflow layout
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
@@ -1860,7 +2304,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                   style: TextStyle(
                     color: PitchTheme.onSurface,
                     fontWeight: FontWeight.w800,
-                    fontSize: 15,
+                    fontSize: 15.5,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1881,29 +2325,40 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 10),
             Row(
               children: [
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: PitchTheme.primary,
-                    side: const BorderSide(color: PitchTheme.outlineVariant),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: PitchTheme.primary,
+                      side: const BorderSide(color: PitchTheme.outlineVariant),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.playlist_add, size: 17),
+                    label: const Text(
+                      'Enroll Teams',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                    ),
+                    onPressed: _showEnrollTeamsDialog,
                   ),
-                  icon: const Icon(Icons.playlist_add, size: 16),
-                  label: const Text('Enroll Teams', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                  onPressed: _showEnrollTeamsDialog,
                 ),
-                const SizedBox(width: 6),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: PitchTheme.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: PitchTheme.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.add, size: 17),
+                    label: const Text(
+                      'New Team',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                    ),
+                    onPressed: _showCreateTeamForTournamentDialog,
                   ),
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('+ New Team', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                  onPressed: _showCreateTeamForTournamentDialog,
                 ),
               ],
             ),
@@ -2580,6 +3035,40 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                 subtitle: const Text('Export branded PNG standings card', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
                 trailing: const Icon(Icons.chevron_right, size: 18),
                 onTap: () => sharePointsTableImage(context, store, tournament),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calculate_outlined, color: PitchTheme.primary),
+                title: const Text('Qualification Scenarios', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                subtitle: const Text('Mathematical qualification chances & pathways', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
+                trailing: const Icon(Icons.chevron_right, size: 18),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => QualificationChancesScreen(
+                      store: store,
+                      initialTournamentId: tournament.id,
+                    ),
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.functions_outlined, color: PitchTheme.primary),
+                title: const Text('ICC NRR Calculator', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                subtitle: const Text('Run rate differential simulator for remaining matches', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
+                trailing: const Icon(Icons.chevron_right, size: 18),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => NrrCalculatorScreen(
+                      store: store,
+                      initialTournamentId: tournament.id,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

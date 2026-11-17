@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
@@ -37,11 +38,9 @@ Future<Tournament?> showTournamentEditDialog(
 
   final selectedTeamIds = List<String>.from(existing?.teamIds ?? []);
 
-  final oversOptions = [5, 6, 8, 10, 12, 15, 20, 50];
-  if (!oversOptions.contains(oversLimit)) {
-    oversOptions.add(oversLimit);
-    oversOptions.sort();
-  }
+  final standardOvers = [5, 6, 8, 10, 12, 15, 20, 50];
+  var isCustomOvers = !standardOvers.contains(oversLimit);
+  final customOversCtrl = TextEditingController(text: isCustomOvers ? '$oversLimit' : '');
 
   Future<void> pickLogo(StateSetter setD) async {
     try {
@@ -302,7 +301,7 @@ Future<Tournament?> showTournamentEditDialog(
                                   ),
                                   const SizedBox(height: 6),
                                   DropdownButtonFormField<int>(
-                                    initialValue: oversLimit,
+                                    initialValue: isCustomOvers ? -1 : oversLimit,
                                     decoration: InputDecoration(
                                       filled: true,
                                       fillColor: PitchTheme.surfaceContainerLow,
@@ -312,16 +311,40 @@ Future<Tournament?> showTournamentEditDialog(
                                         borderSide: BorderSide(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
                                       ),
                                     ),
-                                    items: oversOptions
-                                        .map((o) => DropdownMenuItem(
-                                              value: o,
-                                              child: Text(
-                                                '$o Overs',
-                                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                                              ),
-                                            ))
-                                        .toList(),
-                                    onChanged: (v) => setD(() => oversLimit = v ?? 8),
+                                    items: [
+                                      ...standardOvers.map((o) => DropdownMenuItem(
+                                            value: o,
+                                            child: Text(
+                                              '$o Overs',
+                                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                            ),
+                                          )),
+                                      const DropdownMenuItem(
+                                        value: -1,
+                                        child: Text(
+                                          'Custom...',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 13,
+                                            color: PitchTheme.secondary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: (v) {
+                                      setD(() {
+                                        if (v == -1) {
+                                          isCustomOvers = true;
+                                          final parsed = int.tryParse(customOversCtrl.text.trim());
+                                          if (parsed != null && parsed > 0) {
+                                            oversLimit = parsed;
+                                          }
+                                        } else {
+                                          isCustomOvers = false;
+                                          oversLimit = v ?? 8;
+                                        }
+                                      });
+                                    },
                                   ),
                                 ],
                               ),
@@ -365,6 +388,50 @@ Future<Tournament?> showTournamentEditDialog(
                             ),
                           ],
                         ),
+                        if (isCustomOvers) ...[
+                          const SizedBox(height: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'CUSTOM OVERS (1 - 100)',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                  color: PitchTheme.secondary,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              TextFormField(
+                                controller: customOversCtrl,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                decoration: InputDecoration(
+                                  hintText: 'Enter number of overs (e.g. 2, 4, 7, 25)',
+                                  prefixIcon: const Icon(Icons.sports_cricket, size: 18, color: PitchTheme.secondary),
+                                  filled: true,
+                                  fillColor: PitchTheme.surfaceContainerLow,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(color: PitchTheme.secondary, width: 1.5),
+                                  ),
+                                ),
+                                onChanged: (val) {
+                                  final parsed = int.tryParse(val.trim());
+                                  if (parsed != null && parsed > 0 && parsed <= 100) {
+                                    oversLimit = parsed;
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 16),
 
                         // 4. Venue & Date
@@ -687,6 +754,16 @@ Future<Tournament?> showTournamentEditDialog(
                               );
                               return;
                             }
+                            if (isCustomOvers) {
+                              final parsed = int.tryParse(customOversCtrl.text.trim());
+                              if (parsed == null || parsed <= 0 || parsed > 100) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Please enter a valid number of overs (1-100).')),
+                                );
+                                return;
+                              }
+                              oversLimit = parsed;
+                            }
                             Navigator.pop(c, true);
                           },
                           style: ElevatedButton.styleFrom(
@@ -729,6 +806,7 @@ Future<Tournament?> showTournamentEditDialog(
       ballType: ballType,
       startDateIso: startDateIso,
       creatorId: store.effectiveUserId,
+      published: true,
     );
     await store.upsertTournament(t);
     unawaited(() async {

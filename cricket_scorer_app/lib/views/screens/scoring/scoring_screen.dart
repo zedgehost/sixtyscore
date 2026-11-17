@@ -13,13 +13,13 @@ import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/services/sync/sync_service.dart';
 import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
-import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/audio/tts_service.dart';
 import 'package:cricket_scorer_app/domain/tournament/tournament_engine.dart';
 import 'package:cricket_scorer_app/views/widgets/charts.dart';
 import 'package:cricket_scorer_app/views/widgets/potm_picker.dart';
 import 'package:cricket_scorer_app/views/screens/scorecard/scorecard_screen.dart';
 import 'package:cricket_scorer_app/views/screens/scoring/super_over_screen.dart';
+import 'package:cricket_scorer_app/views/screens/tournament/tournament_detail_screen.dart';
 import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
 
@@ -62,17 +62,14 @@ class _ScoringScreenState extends State<ScoringScreen> {
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final restricted = AuthService().isRestrictedGuest;
-      if (mounted &&
-          (restricted ||
-              !match.canUserScore(store.effectiveUserId,
-                  userCode: store.effectiveUserCode))) {
+      final isOtherUserMatch = match.creatorId.isNotEmpty &&
+          !match.canUserScore(store.effectiveUserId,
+              userCode: store.effectiveUserCode);
+      if (mounted && isOtherUserMatch) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              restricted
-                  ? 'Guest mode is view-only. Sign in with Google to score matches.'
-                  : 'Only the match creator (${match.creatorName.isNotEmpty ? match.creatorName : "creator"}) can score this match. Switched to Match Centre.',
+              'Only the match creator (${match.creatorName.isNotEmpty ? match.creatorName : "creator"}) can score this match. Switched to Match Centre.',
             ),
             backgroundColor: PitchTheme.primary,
           ),
@@ -106,6 +103,26 @@ class _ScoringScreenState extends State<ScoringScreen> {
     super.dispose();
   }
 
+  void _handleBack() {
+    store.persistMatchesOnly();
+    CpanelSyncService.triggerAutoSyncFor(store);
+
+    final tid = match.tournamentId;
+    if (tid != null && tid.isNotEmpty) {
+      final t = store.tournamentById(tid);
+      if (t != null) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => TournamentDetailScreen(store: store, tournament: t),
+          ),
+          (route) => route.isFirst,
+        );
+        return;
+      }
+    }
+    Navigator.of(context).maybePop();
+  }
+
   InningsState get inn {
     if (match.innings.isEmpty) startInnings(match, 1);
     return match.innings.last;
@@ -117,7 +134,16 @@ class _ScoringScreenState extends State<ScoringScreen> {
   Future<void> _afterChange() async {
     final wasLive = match.status == 'live';
     try {
-      computeResult(match, store.teamName);
+      final res = computeResult(match, store.teamName);
+      if (res.isNotEmpty && match.status != 'noResult') {
+        match.status = 'completed';
+        match.resultText = res;
+      } else if (match.innings.length >= 2 && match.innings[1].isComplete) {
+        match.status = 'completed';
+        if (match.resultText.isEmpty) {
+          match.resultText = computeResult(match, store.teamName);
+        }
+      }
       // Smoothness (v1.4.3): per ball, only the matches key is
       // written — teams/photos and everything else are untouched
       // by a ball, so re-encoding them per ball was pure load.
@@ -330,69 +356,140 @@ class _ScoringScreenState extends State<ScoringScreen> {
       context: context,
       builder: (c) => StatefulBuilder(
         builder: (c, setD) => AlertDialog(
-          title: const Text('Openers & first bowler'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+          backgroundColor: PitchTheme.surfaceContainerLowest,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          actionsPadding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+          title: Row(
             children: [
-              // Fresh XI lists on every rebuild: a player added
-              // mid-dialog appears in the dropdowns at once.
-              _playerDropdown(
-                'Striker',
-                inn.battingXI,
-                striker,
-                (v) => setD(() => striker = v),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: PitchTheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.sports_cricket, size: 20, color: PitchTheme.tertiaryFixed),
               ),
-              _playerDropdown(
-                'Non-striker',
-                inn.battingXI,
-                nonStriker,
-                (v) => setD(() => nonStriker = v),
-              ),
-              _playerDropdown(
-                'Bowler',
-                inn.bowlingXI,
-                bowler,
-                (v) => setD(() => bowler = v),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton.icon(
-                      onPressed: () async {
-                        final id = await _addNewPlayerToXi(
-                          inn.battingTeamId,
-                        );
-                        if (id != null) setD(() {});
-                      },
-                      icon: const Icon(Icons.person_add, size: 18),
-                      label: const Text('Add new batter'),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Openers & First Bowler',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: PitchTheme.onSurface,
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: TextButton.icon(
-                      onPressed: () async {
-                        final id = await _addNewPlayerToXi(
-                          inn.bowlingTeamId,
-                        );
-                        if (id != null) setD(() {});
-                      },
-                      icon: const Icon(Icons.person_add, size: 18),
-                      label: const Text('Add new bowler'),
+                    SizedBox(height: 2),
+                    Text(
+                      'Select crease batters and opening bowler',
+                      style: TextStyle(fontSize: 11.5, color: PitchTheme.outline, fontWeight: FontWeight.w500),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
+          ),
+          content: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 4),
+                // Fresh XI lists on every rebuild: a player added
+                // mid-dialog appears in the dropdowns at once.
+                _playerDropdown(
+                  'Striker',
+                  inn.battingXI,
+                  striker,
+                  (v) => setD(() => striker = v),
+                  icon: Icons.sports_cricket,
+                ),
+                const SizedBox(height: 14),
+                _playerDropdown(
+                  'Non-striker',
+                  inn.battingXI,
+                  nonStriker,
+                  (v) => setD(() => nonStriker = v),
+                  icon: Icons.sports_cricket,
+                ),
+                const SizedBox(height: 14),
+                _playerDropdown(
+                  'Bowler',
+                  inn.bowlingXI,
+                  bowler,
+                  (v) => setD(() => bowler = v),
+                  icon: Icons.sports_baseball_outlined,
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: PitchTheme.primary,
+                          side: BorderSide(color: PitchTheme.outlineVariant.withValues(alpha: 0.6)),
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () async {
+                          final id = await _addNewPlayerToXi(inn.battingTeamId);
+                          if (id != null) setD(() {});
+                        },
+                        icon: const Icon(Icons.person_add, size: 16, color: PitchTheme.secondary),
+                        label: const Text(
+                          'Add Batter',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: PitchTheme.primary,
+                          side: BorderSide(color: PitchTheme.outlineVariant.withValues(alpha: 0.6)),
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () async {
+                          final id = await _addNewPlayerToXi(inn.bowlingTeamId);
+                          if (id != null) setD(() {});
+                        },
+                        icon: const Icon(Icons.person_add, size: 16, color: PitchTheme.secondary),
+                        label: const Text(
+                          'Add Bowler',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: const Text('Cancel'),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: PitchTheme.outline, fontWeight: FontWeight.w700),
+              ),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: PitchTheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
               onPressed: () => Navigator.pop(c, true),
-              child: const Text('Start'),
+              child: const Text('Start Match', style: TextStyle(fontWeight: FontWeight.w800)),
             ),
           ],
         ),
@@ -412,26 +509,61 @@ class _ScoringScreenState extends State<ScoringScreen> {
     String label,
     List<String> ids,
     String? value,
-    void Function(String?) onChanged,
-  ) {
-    return DropdownButtonFormField<String>(
-      initialValue: value,
-      // Expanded + ellipsis (owner UI rule 2026-10-24): long
-      // player names must never push the dropdown past the
-      // dialog/screen width.
-      isExpanded: true,
-      decoration: InputDecoration(labelText: label),
-      items: ids
-          .map((id) => DropdownMenuItem(
-                value: id,
-                child: Text(
-                  nameOf(id),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ))
-          .toList(),
-      onChanged: onChanged,
+    void Function(String?) onChanged, {
+    IconData? icon,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.5,
+            color: PitchTheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 5),
+        DropdownButtonFormField<String>(
+          initialValue: value,
+          isExpanded: true,
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon ?? Icons.person_outline, size: 18, color: PitchTheme.primary),
+            filled: true,
+            fillColor: PitchTheme.surfaceContainerLow,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: PitchTheme.secondary, width: 1.5),
+            ),
+          ),
+          items: ids
+              .map((id) => DropdownMenuItem(
+                    value: id,
+                    child: Text(
+                      nameOf(id),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: PitchTheme.onSurface,
+                      ),
+                    ),
+                  ))
+              .toList(),
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 
@@ -1104,22 +1236,33 @@ class _ScoringScreenState extends State<ScoringScreen> {
     final needRuns = target > 0 ? target - inn.totalRuns : 0;
     final ballsLeft = inn.oversLimit * inn.ballsPerOver - inn.legalBalls;
 
-    return Scaffold(
-      backgroundColor: PitchTheme.surface,
-      appBar: AppBar(
-        backgroundColor: PitchTheme.surfaceContainerLowest,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: PitchTheme.primary),
-        titleTextStyle: const TextStyle(
-          color: PitchTheme.onSurface,
-          fontSize: 17,
-          fontWeight: FontWeight.w800,
-        ),
-        title: Text(
-          '${store.teamName(match.teamAId)} vs ${store.teamName(match.teamBId)}',
-        ),
-        actions: [
+    return PopScope(
+      canPop: match.tournamentId == null || match.tournamentId!.isEmpty,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: PitchTheme.surface,
+        appBar: AppBar(
+          backgroundColor: PitchTheme.surfaceContainerLowest,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: PitchTheme.primary),
+            tooltip: 'Back',
+            onPressed: _handleBack,
+          ),
+          iconTheme: const IconThemeData(color: PitchTheme.primary),
+          titleTextStyle: const TextStyle(
+            color: PitchTheme.onSurface,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+          ),
+          title: Text(
+            '${store.teamName(match.teamAId)} vs ${store.teamName(match.teamBId)}',
+          ),
+          actions: [
           IconButton(
             icon: Icon(
               TtsService.instance.enabled
@@ -1247,6 +1390,58 @@ class _ScoringScreenState extends State<ScoringScreen> {
                 if (confirm != true) return;
                 inn.endedEarly = true;
                 await _afterChange();
+              } else if (v == 'endmatch') {
+                final nav = Navigator.of(context);
+                final res = computeResult(match, store.teamName);
+                final teamAName = store.teamName(match.teamAId);
+                final teamBName = store.teamName(match.teamBId);
+                final winnerOption = await showDialog<String>(
+                  context: context,
+                  builder: (d) => SimpleDialog(
+                    title: const Text('Declare / End Match'),
+                    children: [
+                      if (res.isNotEmpty)
+                        SimpleDialogOption(
+                          onPressed: () => Navigator.pop(d, 'auto'),
+                          child: Text('Auto-calculate: $res'),
+                        ),
+                      SimpleDialogOption(
+                        onPressed: () => Navigator.pop(d, 'teamA'),
+                        child: Text('$teamAName won (conceded / forfeit)'),
+                      ),
+                      SimpleDialogOption(
+                        onPressed: () => Navigator.pop(d, 'teamB'),
+                        child: Text('$teamBName won (conceded / forfeit)'),
+                      ),
+                      SimpleDialogOption(
+                        onPressed: () => Navigator.pop(d, 'tie'),
+                        child: const Text('Match Tied / Abandoned'),
+                      ),
+                    ],
+                  ),
+                );
+                if (winnerOption != null) {
+                  if (winnerOption == 'auto' && res.isNotEmpty) {
+                    match.resultText = res;
+                  } else if (winnerOption == 'teamA') {
+                    match.resultText = '$teamAName won by forfeit';
+                  } else if (winnerOption == 'teamB') {
+                    match.resultText = '$teamBName won by forfeit';
+                  } else {
+                    match.resultText = 'Match Tied';
+                  }
+                  match.status = 'completed';
+                  await store.persistMatchesOnly();
+                  CpanelSyncService.triggerAutoSyncFor(store);
+                  final tid = match.tournamentId;
+                  if (tid != null && tid.isNotEmpty) await applyPlayoffUpdate(store, tid);
+                  if (!mounted) return;
+                  nav.pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => ScorecardScreen(store: store, match: match),
+                    ),
+                  );
+                }
               } else if (v == 'delete') {
                 // v1.3.7: the standard confirm — this was the one
                 // delete in the app with none, on a LIVE match.
@@ -1310,6 +1505,8 @@ class _ScoringScreenState extends State<ScoringScreen> {
               if (!inn.isComplete)
                 const PopupMenuItem(
                     value: 'endinnings', child: Text('End innings')),
+              const PopupMenuItem(
+                  value: 'endmatch', child: Text('End / Declare match')),
               const PopupMenuItem(value: 'delete', child: Text('Delete match')),
             ],
           ),
@@ -1515,7 +1712,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
             ),
         ],
       ),
-    );
+    ));
   }
 
   Widget _creaseRow(String pid, bool striker, InningsState inn) {

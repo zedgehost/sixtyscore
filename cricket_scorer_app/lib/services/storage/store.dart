@@ -786,6 +786,58 @@ class Store extends ChangeNotifier implements PlayoffStore {
       return replaced + added;
     }
 
+    int mergeMatches(List<Match> current, List<Match> incoming) {
+      var replaced = 0;
+      var added = 0;
+      for (final item in incoming) {
+        final i = current.indexWhere((x) => x.id == item.id);
+        if (i >= 0) {
+          final cur = current[i];
+          // Offline-First Conflict Resolution:
+          // 1. If local match is completed, never downgrade to live/upcoming
+          if (cur.status == 'completed' && item.status != 'completed') {
+            continue;
+          }
+          // 2. Count total legal balls bowled
+          final curBalls = cur.innings.fold<int>(0, (sum, inn) => sum + inn.legalBalls);
+          final incBalls = item.innings.fold<int>(0, (sum, inn) => sum + inn.legalBalls);
+          // If local has more balls or local has resultText while incoming doesn't, keep local
+          if (curBalls > incBalls) {
+            continue;
+          }
+          if (cur.resultText.isNotEmpty && item.resultText.isEmpty) {
+            continue;
+          }
+          current[i] = item;
+          replaced++;
+        } else {
+          current.add(item);
+          added++;
+        }
+      }
+      return replaced + added;
+    }
+
+    int mergeTournaments(List<Tournament> current, List<Tournament> incoming) {
+      var replaced = 0;
+      var added = 0;
+      for (final item in incoming) {
+        final i = current.indexWhere((x) => x.id == item.id);
+        if (i >= 0) {
+          final cur = current[i];
+          if (cur.teamIds.length > item.teamIds.length) {
+            item.teamIds = List.from(cur.teamIds);
+          }
+          current[i] = item;
+          replaced++;
+        } else {
+          current.add(item);
+          added++;
+        }
+      }
+      return replaced + added;
+    }
+
     // Decode phase: temp structures only, nothing live touched.
     late final List<Team> tmpTeams;
     late final List<Tournament> tmpTournaments;
@@ -843,8 +895,8 @@ class Store extends ChangeNotifier implements PlayoffStore {
       if (profileParsed) profile = tmpProfile;
       counts['teams'] = mergeList(teams, tmpTeams, (t) => t.id);
       counts['tournaments'] =
-          mergeList(tournaments, tmpTournaments, (t) => t.id);
-      counts['matches'] = mergeList(matches, tmpMatches, (m) => m.id);
+          mergeTournaments(tournaments, tmpTournaments);
+      counts['matches'] = mergeMatches(matches, tmpMatches);
       counts['regPlayers'] =
           mergeList(regPlayers, tmpRegPlayers, (r) => r.id);
       counts['drafts'] = mergeList(drafts, tmpDrafts, (d) => d.id);

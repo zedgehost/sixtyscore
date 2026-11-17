@@ -30,6 +30,17 @@ class CpanelSyncService {
     });
   }
 
+  /// Static convenience launcher that guarantees the client is initialized with auth token
+  static void triggerAutoSyncFor(Store store) {
+    unawaited(() async {
+      try {
+        final client = CpanelApiClient();
+        await client.init();
+        CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+      } catch (_) {}
+    }());
+  }
+
   /// Cancels any pending debounced auto-sync timer.
   static void cancelDebounce() {
     _debounceTimer?.cancel();

@@ -12,30 +12,37 @@ class CpanelApiClient {
   static const String _tokenPrefKey = 'cpanel_api_token';
   static const String _baseUrlPrefKey = 'cpanel_api_base_url';
 
+  static String? _cachedToken;
+  static String? _cachedBaseUrl;
+
   final http.Client _client;
   String _baseUrl;
   String? _token;
 
   CpanelApiClient({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
-        _baseUrl = baseUrl ?? _defaultBaseUrl;
+        _baseUrl = baseUrl ?? _cachedBaseUrl ?? _defaultBaseUrl,
+        _token = _cachedToken;
 
   String get baseUrl => _baseUrl;
-  String? get token => _token;
+  String? get token => _token ?? _cachedToken;
 
   /// Load persisted credentials from local preferences
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString(_tokenPrefKey);
+    _cachedToken = _token;
     final customUrl = prefs.getString(_baseUrlPrefKey);
     if (customUrl != null && customUrl.isNotEmpty) {
       _baseUrl = customUrl;
+      _cachedBaseUrl = customUrl;
     }
   }
 
   /// Update base URL (e.g. when connecting to your live cPanel domain)
   Future<void> setBaseUrl(String url) async {
     _baseUrl = url.replaceAll(RegExp(r'/+$'), '');
+    _cachedBaseUrl = _baseUrl;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_baseUrlPrefKey, _baseUrl);
   }
@@ -43,6 +50,7 @@ class CpanelApiClient {
   /// Store authentication token locally
   Future<void> setToken(String? token) async {
     _token = token;
+    _cachedToken = token;
     final prefs = await SharedPreferences.getInstance();
     if (token != null) {
       await prefs.setString(_tokenPrefKey, token);

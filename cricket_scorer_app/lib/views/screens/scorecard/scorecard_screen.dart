@@ -1,8 +1,10 @@
 ﻿// Match Centre: Summary / Scorecard / Stats / Super Stars / Balls / Info.
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:cricket_scorer_app/models/models.dart';
 import 'package:cricket_scorer_app/core/utils/nav_memory.dart';
+import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 import 'package:cricket_scorer_app/services/export/pdf_export.dart';
 import 'package:cricket_scorer_app/services/share/poster_summary.dart';
 import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
@@ -18,11 +20,86 @@ import 'package:cricket_scorer_app/views/widgets/charts.dart';
 import 'package:cricket_scorer_app/views/widgets/player_avatar.dart';
 import 'package:cricket_scorer_app/views/widgets/potm_picker.dart';
 import 'package:cricket_scorer_app/views/screens/teams/profile_screen.dart';
+import 'package:cricket_scorer_app/views/screens/tournament/tournament_detail_screen.dart';
 
-class ScorecardScreen extends StatelessWidget {
+class ScorecardScreen extends StatefulWidget {
   final Store store;
   final Match match;
   const ScorecardScreen({super.key, required this.store, required this.match});
+
+  @override
+  State<ScorecardScreen> createState() => _ScorecardScreenState();
+}
+
+class _ScorecardScreenState extends State<ScorecardScreen> {
+  Store get store => widget.store;
+  late Match match;
+  Timer? _liveAutoPollTimer;
+  bool _isAutoPolling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    match = widget.store.matchById(widget.match.id) ?? widget.match;
+    _startLivePollingIfNeeded();
+  }
+
+  void _startLivePollingIfNeeded() {
+    _liveAutoPollTimer?.cancel();
+    if (match.status == 'live') {
+      _liveAutoPollTimer = Timer.periodic(
+        const Duration(seconds: 3),
+        (_) => _autoPollLiveUpdates(),
+      );
+    }
+  }
+
+  Future<void> _autoPollLiveUpdates() async {
+    if (!mounted || _isAutoPolling) return;
+    _isAutoPolling = true;
+    try {
+      // 1. Check local store in case another tab or local scoring updated it
+      final local = widget.store.matchById(widget.match.id);
+      if (local != null && local != match) {
+        if (mounted) {
+          setState(() {
+            match = local;
+          });
+        }
+      }
+
+      // 2. Fetch live match details from cPanel cloud in background
+      final client = CpanelApiClient();
+      await client.init();
+      final res = await client.getMatchDetail(widget.match.id);
+      if (res['success'] == true && res['data'] != null) {
+        final data = res['data'];
+        final payload = data['payload'];
+        if (payload is Map && payload.isNotEmpty) {
+          final updated = Match.fromJson(Map<String, dynamic>.from(payload));
+          await widget.store.upsertMatch(updated);
+          if (mounted) {
+            setState(() {
+              match = updated;
+            });
+            if (match.status != 'live') {
+              _liveAutoPollTimer?.cancel();
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Silent error: offline-first ensures app never crashes if offline
+    } finally {
+      _isAutoPolling = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _liveAutoPollTimer?.cancel();
+    super.dispose();
+  }
 
   String nameOf(String id) => store.playerName(id);
 
@@ -46,8 +123,36 @@ class ScorecardScreen extends StatelessWidget {
     );
   }
 
+  void _handleBack(BuildContext context) {
+    final tid = match.tournamentId;
+    if (tid != null && tid.isNotEmpty) {
+      final t = store.tournamentById(tid);
+      if (t != null) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => TournamentDetailScreen(store: store, tournament: t),
+          ),
+          (route) => route.isFirst,
+        );
+        return;
+      }
+    }
+    Navigator.of(context).maybePop();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasWinnerResult = match.resultText.isNotEmpty && match.status != 'noResult';
+    final hasBothInningsDone = match.innings.length >= 2 && match.innings[1].isComplete;
+    if ((hasWinnerResult || hasBothInningsDone) && match.status != 'completed') {
+      match.status = 'completed';
+      if (match.resultText.isEmpty) {
+        final res = computeResult(match, store.teamName);
+        if (res.isNotEmpty) match.resultText = res;
+      }
+      store.persistMatchesOnly();
+    }
+
     return _ScorecardNavScope(
       matchId: match.id,
       child: _buildContent(context),
@@ -57,21 +162,32 @@ class ScorecardScreen extends StatelessWidget {
   Widget _buildContent(BuildContext context) {
     final isScorer = !AuthService().isRestrictedGuest &&
         match.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode);
-    return DefaultTabController(
-      length: 6,
-      child: Scaffold(
-        backgroundColor: PitchTheme.surface,
-        appBar: AppBar(
-          backgroundColor: PitchTheme.surfaceContainerLowest,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: PitchTheme.primary),
-          titleTextStyle: const TextStyle(
-            color: PitchTheme.onSurface,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-          ),
-          title: const Text('Match Centre'),
+    return PopScope(
+      canPop: match.tournamentId == null || match.tournamentId!.isEmpty,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack(context);
+      },
+      child: DefaultTabController(
+        length: 6,
+        child: Scaffold(
+          backgroundColor: PitchTheme.surface,
+          appBar: AppBar(
+            backgroundColor: PitchTheme.surfaceContainerLowest,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: PitchTheme.primary),
+              tooltip: 'Back',
+              onPressed: () => _handleBack(context),
+            ),
+            iconTheme: const IconThemeData(color: PitchTheme.primary),
+            titleTextStyle: const TextStyle(
+              color: PitchTheme.onSurface,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+            title: const Text('Match Centre'),
           actions: [
             if (matchIsTied(match) && isScorer)
               IconButton(
@@ -290,53 +406,64 @@ class ScorecardScreen extends StatelessWidget {
                           ),
                         )
                       : Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
                           decoration: BoxDecoration(
-                            color: PitchTheme.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: PitchTheme.outlineVariant),
+                            color: PitchTheme.surfaceContainerLowest,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.visibility_outlined, size: 18, color: PitchTheme.secondary),
+                              Container(
+                                width: 9,
+                                height: 9,
+                                decoration: const BoxDecoration(
+                                  color: PitchTheme.error,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'Live Match Centre • Scored by ${match.creatorName.isNotEmpty ? match.creatorName : "Creator"}',
+                                  'Live Telemetry • Auto-Updating',
                                   style: const TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.3,
                                     color: PitchTheme.onSurface,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              InkWell(
-                                onTap: () {
-                                  if (context.mounted) {
-                                    (context as Element).markNeedsBuild();
-                                  }
-                                },
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: PitchTheme.surfaceContainerLowest,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.refresh, size: 14, color: PitchTheme.primary),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Refresh',
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: PitchTheme.primary),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: PitchTheme.secondaryContainer.withValues(alpha: 0.35),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.wifi_tethering, size: 12, color: PitchTheme.secondary),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'REALTIME',
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: PitchTheme.onSecondaryContainer,
+                                        letterSpacing: 0.5,
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -346,7 +473,7 @@ class ScorecardScreen extends StatelessWidget {
               )
             : null,
       ),
-    );
+    ));
   }
 
   // ---------------- Scorecard tab ----------------
