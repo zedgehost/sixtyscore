@@ -1,6 +1,7 @@
 ﻿// 60Score — offline cricket scorer for the Super Sixty League.
 
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,8 @@ import 'package:cricket_scorer_app/core/theme/theme.dart';
 import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
 
 import 'package:cricket_scorer_app/services/auth/auth_service.dart';
+
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 import 'package:cricket_scorer_app/services/backup/backup_service.dart';
 
@@ -63,10 +66,34 @@ void main() {
   DebugInfo.installHooks();
 
   // Fire-and-forget: falls back to offline mode when Firebase is not set up.
-
-  AuthService().init();
+  
+  AuthService().init().then((_) => _initCrashlytics());
 
   runApp(const Score60App());
+}
+
+/// Install Firebase Crashlytics reporting once Firebase is ready.
+/// Wraps the DebugInfo hooks (local recording stays as-is) and forwards
+/// Flutter + async errors to Crashlytics. No-op when Firebase is
+/// unavailable so startup never breaks.
+void _initCrashlytics() {
+    if (!AuthService().firebaseReady) return;
+    try {
+          final crashlytics = FirebaseCrashlytics.instance;
+          final prevFlutterError = FlutterError.onError;
+          FlutterError.onError = (details) {
+                  prevFlutterError?.call(details);
+                  crashlytics.recordFlutterFatalError(details);
+          };
+          final prevOnError = ui.PlatformDispatcher.instance.onError;
+          ui.PlatformDispatcher.instance.onError = (error, stack) {
+                  final handled = prevOnError?.call(error, stack) ?? false;
+                  crashlytics.recordError(error, stack, fatal: true);
+                  return handled;
+          };
+    } catch (_) {
+          // Crashlytics unavailable — the app keeps working without it.
+    }
 }
 
 class Score60App extends StatelessWidget {
