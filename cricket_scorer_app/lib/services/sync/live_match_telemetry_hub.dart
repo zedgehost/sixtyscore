@@ -307,11 +307,18 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
 
       final payloadCandidate = data['payload'];
       final rawPayload = payloadCandidate is Map && payloadCandidate.isNotEmpty
-          ? payloadCandidate
-          : data;
+          ? Map<String, dynamic>.from(payloadCandidate)
+          : Map<String, dynamic>.from(data);
 
       if (rawPayload.isNotEmpty) {
-        final updated = Match.fromJson(Map<String, dynamic>.from(rawPayload));
+        // Enforce top-level server status and result_text to guarantee completed state sync
+        if (data['status'] != null) {
+          rawPayload['status'] = data['status'];
+        }
+        if (data['result_text'] != null && (data['result_text'] as String).isNotEmpty) {
+          rawPayload['resultText'] = data['result_text'];
+        }
+        final updated = Match.fromJson(rawPayload);
 
         // Hydrate squads and player names into store
         final teamsData = data['teams'];

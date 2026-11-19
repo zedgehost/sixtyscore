@@ -196,15 +196,16 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   Future<void> _openFixture(Match m) async {
-    final hasWinnerResult = m.resultText.isNotEmpty && m.status != 'noResult';
-    final hasBothInningsDone = m.innings.length >= 2 && m.innings[1].isComplete;
-    final isMatchCompleted = m.status == 'completed' || hasWinnerResult || hasBothInningsDone;
+    final fresh = store.matchById(m.id) ?? m;
+    final hasWinnerResult = fresh.resultText.isNotEmpty && fresh.status != 'noResult';
+    final hasBothInningsDone = fresh.innings.length >= 2 && fresh.innings[1].isComplete;
+    final isMatchCompleted = fresh.status == 'completed' || hasWinnerResult || hasBothInningsDone;
 
-    if (isMatchCompleted && m.status != 'completed') {
-      m.status = 'completed';
-      if (m.resultText.isEmpty) {
-        final res = computeResult(m, store.teamName);
-        if (res.isNotEmpty) m.resultText = res;
+    if (isMatchCompleted && fresh.status != 'completed') {
+      fresh.status = 'completed';
+      if (fresh.resultText.isEmpty) {
+        final res = computeResult(fresh, store.teamName);
+        if (res.isNotEmpty) fresh.resultText = res;
       }
       await store.persistMatchesOnly();
       _triggerCloudSync();
@@ -213,16 +214,16 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     late final Widget screen;
     final isTournamentOwner = tournament.creatorId.isEmpty || tournament.creatorId == store.effectiveUserId;
     final canScore = !AuthService().isRestrictedGuest &&
-        (isTournamentOwner || m.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode));
+        (isTournamentOwner || fresh.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode));
 
     if (isMatchCompleted) {
-      screen = ScorecardScreen(store: store, match: m, isScorer: canScore);
-    } else if (m.status == 'live') {
+      screen = ScorecardScreen(store: store, match: fresh, isScorer: canScore);
+    } else if (fresh.status == 'live') {
       screen = canScore
-          ? ScoringScreen(store: store, match: m)
-          : ScorecardScreen(store: store, match: m, isScorer: false);
+          ? ScoringScreen(store: store, match: fresh)
+          : ScorecardScreen(store: store, match: fresh, isScorer: false);
     } else {
-      screen = FixtureDetailScreen(store: store, matchId: m.id);
+      screen = FixtureDetailScreen(store: store, matchId: fresh.id);
     }
 
     if (!mounted) return;
@@ -569,7 +570,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     await _runPlayoffUpdate();
   }
 
-  Widget _fixtureCard(Match m, {String? stageOverride}) {
+  Widget _fixtureCard(Match rawM, {String? stageOverride}) {
+    final m = store.matchById(rawM.id) ?? rawM;
     final hasWinnerResult = m.resultText.isNotEmpty && m.status != 'noResult';
     final hasBothInningsDone = m.innings.length >= 2 && m.innings[1].isComplete;
     final isMatchCompleted = m.status == 'completed' || hasWinnerResult || hasBothInningsDone;

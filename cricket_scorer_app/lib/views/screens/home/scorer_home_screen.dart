@@ -123,21 +123,37 @@ class _ScorerHomeScreenState extends State<ScorerHomeScreen> {
   /// the fixture hub too (never the scorecard — that was the red-screen bug).
 
   void _openMatch(Match m) {
+    final fresh = store.matchById(m.id) ?? m;
+    final hasWinnerResult = fresh.resultText.isNotEmpty && fresh.status != 'noResult';
+    final hasBothInningsDone = fresh.innings.length >= 2 && fresh.innings[1].isComplete;
+    final isMatchCompleted = fresh.status == 'completed' || hasWinnerResult || hasBothInningsDone;
+
     final canScore = !AuthService().isRestrictedGuest &&
-        m.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode);
-    if (m.status == 'live') {
+        fresh.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode);
+
+    if (isMatchCompleted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ScorecardScreen(store: store, match: fresh, isScorer: canScore),
+        ),
+      );
+      return;
+    }
+
+    if (fresh.status == 'live') {
       if (canScore) {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ScoringScreen(store: store, match: m),
+            builder: (_) => ScoringScreen(store: store, match: fresh),
           ),
         );
       } else {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ScorecardScreen(store: store, match: m),
+            builder: (_) => ScorecardScreen(store: store, match: fresh),
           ),
         );
       }
