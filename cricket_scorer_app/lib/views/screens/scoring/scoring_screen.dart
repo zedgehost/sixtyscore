@@ -65,6 +65,20 @@ class _ScoringScreenState extends State<ScoringScreen> {
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final hasWinnerResult = match.resultText.isNotEmpty && match.status != 'noResult';
+      final hasBothInningsDone = match.innings.length >= 2 && match.innings[1].isComplete;
+      final isMatchCompleted = match.status == 'completed' || hasWinnerResult || hasBothInningsDone;
+
+      if (mounted && isMatchCompleted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ScorecardScreen(store: store, match: match, isScorer: true),
+          ),
+        );
+        return;
+      }
+
       final canScore = !store.isRemotePreview &&
           !AuthService().isRestrictedGuest &&
           store.matches.any((m) => m.id == match.id) &&
@@ -1443,6 +1457,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
                   }
                   match.status = 'completed';
                   await store.persistMatchesOnly();
+                  await LiveMatchTelemetryHub.instance.onMatchScored(match);
                   CpanelSyncService.triggerAutoSyncFor(store);
                   final tid = match.tournamentId;
                   if (tid != null && tid.isNotEmpty) await applyPlayoffUpdate(store, tid);
@@ -2186,6 +2201,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
                   }
                   match.status = 'completed';
                   await store.persistMatchesOnly();
+                  await LiveMatchTelemetryHub.instance.onMatchScored(match);
 
                   // Non-blocking background sync to cPanel / live feed
                   unawaited(() async {

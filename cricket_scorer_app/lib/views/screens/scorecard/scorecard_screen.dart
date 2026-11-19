@@ -46,6 +46,16 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
   void initState() {
     super.initState();
     match = widget.store.matchById(widget.match.id) ?? widget.match;
+    final hasWinnerResult = match.resultText.isNotEmpty && match.status != 'noResult';
+    final hasBothInningsDone = match.innings.length >= 2 && match.innings[1].isComplete;
+    if ((hasWinnerResult || hasBothInningsDone) && match.status != 'completed') {
+      match.status = 'completed';
+      if (match.resultText.isEmpty) {
+        final res = computeResult(match, store.teamName);
+        if (res.isNotEmpty) match.resultText = res;
+      }
+      widget.store.persistMatchesOnly();
+    }
     // Centralized Realtime Telemetry: accelerate polling to 2.2s heartbeat
     LiveMatchTelemetryHub.instance.setFocusedMatch(widget.match.id, store: widget.store);
     LiveMatchTelemetryHub.instance.addListener(_onHubNotification);
@@ -116,17 +126,6 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasWinnerResult = match.resultText.isNotEmpty && match.status != 'noResult';
-    final hasBothInningsDone = match.innings.length >= 2 && match.innings[1].isComplete;
-    if ((hasWinnerResult || hasBothInningsDone) && match.status != 'completed') {
-      match.status = 'completed';
-      if (match.resultText.isEmpty) {
-        final res = computeResult(match, store.teamName);
-        if (res.isNotEmpty) match.resultText = res;
-      }
-      store.persistMatchesOnly();
-    }
-
     return _ScorecardNavScope(
       matchId: match.id,
       child: _buildContent(context),
