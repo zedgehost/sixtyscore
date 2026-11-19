@@ -87,6 +87,9 @@ class Store extends ChangeNotifier implements PlayoffStore {
     return s;
   }
 
+  /// True when this Store is an in-memory preview for viewing another user's match as a spectator.
+  bool get isRemotePreview => _identityId == 'remote_preview';
+
   List<Team> teams = [];
   List<Tournament> tournaments = [];
   @override
@@ -1257,6 +1260,7 @@ class Store extends ChangeNotifier implements PlayoffStore {
   /// must tell the user — backup/restore/edit saves — check this
   /// instead of relying on a throw that nobody awaited).
   Future<bool> persist({bool skipSync = false}) async {
+    if (isRemotePreview) return true;
     try {
       await _saveAll();
       await setLastModified(DateTime.now().millisecondsSinceEpoch);

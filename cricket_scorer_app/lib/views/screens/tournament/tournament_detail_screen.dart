@@ -176,15 +176,16 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     }
 
     late final Widget screen;
+    final isTournamentOwner = tournament.creatorId.isEmpty || tournament.creatorId == store.effectiveUserId;
     final canScore = !AuthService().isRestrictedGuest &&
-        m.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode);
+        (isTournamentOwner || m.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode));
 
     if (isMatchCompleted) {
-      screen = ScorecardScreen(store: store, match: m);
+      screen = ScorecardScreen(store: store, match: m, isScorer: canScore);
     } else if (m.status == 'live') {
       screen = canScore
           ? ScoringScreen(store: store, match: m)
-          : ScorecardScreen(store: store, match: m);
+          : ScorecardScreen(store: store, match: m, isScorer: false);
     } else {
       screen = FixtureDetailScreen(store: store, matchId: m.id);
     }
@@ -547,6 +548,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       store.persistMatchesOnly();
     }
     final effectiveStatus = isMatchCompleted ? 'completed' : m.status;
+    final isTournamentOwner = tournament.creatorId.isEmpty || tournament.creatorId == store.effectiveUserId;
+    final canScoreThisMatch = !AuthService().isRestrictedGuest &&
+        (isTournamentOwner || m.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode));
 
     final title = m.matchTitle.isNotEmpty
         ? m.matchTitle
@@ -649,15 +653,16 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_calendar_outlined, size: 18),
-                          color: PitchTheme.outline,
-                          tooltip: 'Edit fixture schedule & venue',
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(4),
-                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                          onPressed: () => _showEditFixtureDialog(m),
-                        ),
+                        if (canScoreThisMatch)
+                          IconButton(
+                            icon: const Icon(Icons.edit_calendar_outlined, size: 18),
+                            color: PitchTheme.outline,
+                            tooltip: 'Edit fixture schedule & venue',
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            onPressed: () => _showEditFixtureDialog(m),
+                          ),
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert, size: 18, color: PitchTheme.outline),
                           tooltip: 'Match options',
@@ -672,7 +677,11 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => ScorecardScreen(store: store, match: m),
+                                  builder: (_) => ScorecardScreen(
+                                    store: store,
+                                    match: m,
+                                    isScorer: canScoreThisMatch,
+                                  ),
                                 ),
                               );
                             } else if (action == 'end_match') {
@@ -683,93 +692,109 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                               _markMatchNoResult(m);
                             }
                           },
-                          itemBuilder: (ctx) => [
-                            const PopupMenuItem(
-                              value: 'edit_schedule',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.edit_calendar_outlined, size: 17, color: PitchTheme.outline),
-                                  SizedBox(width: 8),
-                                  Text('Edit Schedule & Venue'),
-                                ],
-                              ),
-                            ),
-                            if (effectiveStatus == 'live') ...[
-                              const PopupMenuItem(
-                                value: 'resume_score',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.sports_cricket, size: 17, color: PitchTheme.primary),
-                                    SizedBox(width: 8),
-                                    Text('Resume Scoring'),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'view_scorecard',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.table_chart_outlined, size: 17, color: PitchTheme.outline),
-                                    SizedBox(width: 8),
-                                    Text('View Scorecard'),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'end_match',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.emoji_events_outlined, size: 17, color: PitchTheme.secondary),
-                                    SizedBox(width: 8),
-                                    Text('End / Concede Match'),
-                                  ],
-                                ),
-                              ),
-                              if (m.innings.isEmpty || m.innings.every((i) => i.legalBalls == 0))
-                                const PopupMenuItem(
-                                  value: 'reset_upcoming',
+                          itemBuilder: (ctx) {
+                            if (!canScoreThisMatch) {
+                              return const [
+                                PopupMenuItem(
+                                  value: 'view_scorecard',
                                   child: Row(
                                     children: [
-                                      Icon(Icons.restart_alt, size: 17, color: PitchTheme.outline),
+                                      Icon(Icons.table_chart_outlined, size: 17, color: PitchTheme.outline),
                                       SizedBox(width: 8),
-                                      Text('Reset to Upcoming'),
+                                      Text('View Scorecard'),
                                     ],
                                   ),
                                 ),
+                              ];
+                            }
+                            return [
                               const PopupMenuItem(
-                                value: 'no_result',
+                                value: 'edit_schedule',
                                 child: Row(
                                   children: [
-                                    Icon(Icons.block, size: 17, color: PitchTheme.error),
+                                    Icon(Icons.edit_calendar_outlined, size: 17, color: PitchTheme.outline),
                                     SizedBox(width: 8),
-                                    Text('Declare No Result'),
+                                    Text('Edit Schedule & Venue'),
                                   ],
                                 ),
                               ),
-                            ],
-                            if (effectiveStatus == 'completed') ...[
-                              const PopupMenuItem(
-                                value: 'view_scorecard',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.table_chart_outlined, size: 17, color: PitchTheme.outline),
-                                    SizedBox(width: 8),
-                                    Text('View Scorecard'),
-                                  ],
+                              if (effectiveStatus == 'live') ...[
+                                const PopupMenuItem(
+                                  value: 'resume_score',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.sports_cricket, size: 17, color: PitchTheme.primary),
+                                      SizedBox(width: 8),
+                                      Text('Resume Scoring'),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'resume_score',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.edit, size: 17, color: PitchTheme.primary),
-                                    SizedBox(width: 8),
-                                    Text('Reopen for Scoring'),
-                                  ],
+                                const PopupMenuItem(
+                                  value: 'view_scorecard',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.table_chart_outlined, size: 17, color: PitchTheme.outline),
+                                      SizedBox(width: 8),
+                                      Text('View Scorecard'),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ],
+                                const PopupMenuItem(
+                                  value: 'end_match',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.emoji_events_outlined, size: 17, color: PitchTheme.secondary),
+                                      SizedBox(width: 8),
+                                      Text('End / Concede Match'),
+                                    ],
+                                  ),
+                                ),
+                                if (m.innings.isEmpty || m.innings.every((i) => i.legalBalls == 0))
+                                  const PopupMenuItem(
+                                    value: 'reset_upcoming',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.restart_alt, size: 17, color: PitchTheme.outline),
+                                        SizedBox(width: 8),
+                                        Text('Reset to Upcoming'),
+                                      ],
+                                    ),
+                                  ),
+                                const PopupMenuItem(
+                                  value: 'no_result',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.block, size: 17, color: PitchTheme.error),
+                                      SizedBox(width: 8),
+                                      Text('Declare No Result'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              if (effectiveStatus == 'completed') ...[
+                                const PopupMenuItem(
+                                  value: 'view_scorecard',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.table_chart_outlined, size: 17, color: PitchTheme.outline),
+                                      SizedBox(width: 8),
+                                      Text('View Scorecard'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'resume_score',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit, size: 17, color: PitchTheme.primary),
+                                      SizedBox(width: 8),
+                                      Text('Reopen for Scoring'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ];
+                          },
                         ),
                       ],
                     ),

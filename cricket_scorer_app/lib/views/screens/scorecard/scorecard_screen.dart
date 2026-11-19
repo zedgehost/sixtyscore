@@ -25,7 +25,13 @@ import 'package:cricket_scorer_app/views/screens/tournament/tournament_detail_sc
 class ScorecardScreen extends StatefulWidget {
   final Store store;
   final Match match;
-  const ScorecardScreen({super.key, required this.store, required this.match});
+  final bool? isScorer;
+  const ScorecardScreen({
+    super.key,
+    required this.store,
+    required this.match,
+    this.isScorer,
+  });
 
   @override
   State<ScorecardScreen> createState() => _ScorecardScreenState();
@@ -77,7 +83,16 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
         final payload = data['payload'];
         if (payload is Map && payload.isNotEmpty) {
           final updated = Match.fromJson(Map<String, dynamic>.from(payload));
-          await widget.store.upsertMatch(updated);
+          if (widget.store.isRemotePreview) {
+            final idx = widget.store.matches.indexWhere((x) => x.id == updated.id);
+            if (idx >= 0) {
+              widget.store.matches[idx] = updated;
+            } else {
+              widget.store.matches.add(updated);
+            }
+          } else {
+            await widget.store.upsertMatch(updated);
+          }
           if (mounted) {
             setState(() {
               match = updated;
@@ -160,8 +175,12 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
   }
 
   Widget _buildContent(BuildContext context) {
-    final isScorer = !AuthService().isRestrictedGuest &&
-        match.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode);
+    final isScorer = widget.isScorer ??
+        (!store.isRemotePreview &&
+            !AuthService().isRestrictedGuest &&
+            store.matches.any((m) => m.id == match.id) &&
+            match.canUserScore(store.effectiveUserId,
+                userCode: store.effectiveUserCode));
     return PopScope(
       canPop: match.tournamentId == null || match.tournamentId!.isEmpty,
       onPopInvokedWithResult: (didPop, result) {

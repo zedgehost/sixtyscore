@@ -21,6 +21,7 @@ import 'package:cricket_scorer_app/views/screens/scorecard/scorecard_screen.dart
 import 'package:cricket_scorer_app/views/screens/scoring/super_over_screen.dart';
 import 'package:cricket_scorer_app/views/screens/tournament/tournament_detail_screen.dart';
 import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
+import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
 
 class ScoringScreen extends StatefulWidget {
@@ -62,21 +63,25 @@ class _ScoringScreenState extends State<ScoringScreen> {
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final isOtherUserMatch = match.creatorId.isNotEmpty &&
-          !match.canUserScore(store.effectiveUserId,
+      final canScore = !store.isRemotePreview &&
+          !AuthService().isRestrictedGuest &&
+          store.matches.any((m) => m.id == match.id) &&
+          match.canUserScore(store.effectiveUserId,
               userCode: store.effectiveUserCode);
-      if (mounted && isOtherUserMatch) {
+      if (mounted && !canScore) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Only the match creator (${match.creatorName.isNotEmpty ? match.creatorName : "creator"}) can score this match. Switched to Match Centre.',
+              'Only the match creator (${match.creatorName.isNotEmpty ? match.creatorName : "authorized scorer"}) can score this match. Switched to Match Centre.',
             ),
             backgroundColor: PitchTheme.primary,
           ),
         );
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => ScorecardScreen(store: store, match: match)),
+          MaterialPageRoute(
+            builder: (_) => ScorecardScreen(store: store, match: match, isScorer: false),
+          ),
         );
       }
     });

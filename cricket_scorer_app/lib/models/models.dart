@@ -1190,9 +1190,9 @@ class Match {
       matchTitle: j['matchTitle'] as String? ?? '',
       ballType: j['ballType'] as String? ?? 'Tennis Ball',
       season: j['season'] as String? ?? '',
-      creatorId: j['creatorId'] as String? ?? '',
-      creatorName: j['creatorName'] as String? ?? '',
-      creatorCode: j['creatorCode'] as String? ?? '',
+      creatorId: j['creatorId'] as String? ?? j['creator_id'] as String? ?? '',
+      creatorName: j['creatorName'] as String? ?? j['creator_name'] as String? ?? '',
+      creatorCode: j['creatorCode'] as String? ?? j['creator_code'] as String? ?? '',
     );
     // v1.3.4: standard matches saved by older builds can carry an
     // impossible 11-wicket innings (the old "11 wickets" setup

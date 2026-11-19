@@ -19,6 +19,7 @@ import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/auth/user_code.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
+import 'package:cricket_scorer_app/views/screens/home/public_matches_screen.dart';
 import 'package:cricket_scorer_app/views/screens/home/scorer_home_screen.dart';
 import 'package:cricket_scorer_app/views/screens/scorecard/scorecard_screen.dart';
 import 'package:cricket_scorer_app/views/screens/scoring/match_setup_screen.dart';
@@ -1343,7 +1344,17 @@ class _HomeScreenState extends State<HomeScreen>
               ],
             ),
             InkWell(
-              onTap: () => widget.onSelectTab(1), // Go to Matches Tab
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PublicMatchesScreen(
+                      store: store,
+                      apiClient: widget.apiClient,
+                    ),
+                  ),
+                );
+              },
               borderRadius: BorderRadius.circular(6),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -1588,6 +1599,15 @@ class _HomeScreenState extends State<HomeScreen>
         matchMap['status'] = rm.status;
         matchMap['resultText'] = rm.resultText;
       }
+      matchMap['creatorId'] = (matchMap['creatorId'] ?? '').toString().isNotEmpty
+          ? matchMap['creatorId']
+          : (data['creator_id'] ?? rm.creatorId);
+      matchMap['creatorCode'] = (matchMap['creatorCode'] ?? '').toString().isNotEmpty
+          ? matchMap['creatorCode']
+          : (data['creator_code'] ?? rm.creatorCode);
+      matchMap['creatorName'] = (matchMap['creatorName'] ?? '').toString().isNotEmpty
+          ? matchMap['creatorName']
+          : (data['creator_name'] ?? rm.creatorName);
 
       final remoteMatch = Match.fromJson(matchMap);
 
@@ -1617,7 +1637,7 @@ class _HomeScreenState extends State<HomeScreen>
       );
 
       if (!mounted) return;
-      _push(ScorecardScreen(store: previewStore, match: remoteMatch));
+      _push(ScorecardScreen(store: previewStore, match: remoteMatch, isScorer: false));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1907,7 +1927,7 @@ class _HomeScreenState extends State<HomeScreen>
         if (canScore) {
           _push(ScoringScreen(store: store, match: m));
         } else {
-          _push(ScorecardScreen(store: store, match: m));
+          _push(ScorecardScreen(store: store, match: m, isScorer: false));
         }
       },
       borderRadius: BorderRadius.circular(16),

@@ -13,6 +13,7 @@ import 'package:cricket_scorer_app/views/screens/tournament/fixture_detail_scree
 import 'package:cricket_scorer_app/views/screens/scoring/match_setup_screen.dart';
 import 'package:cricket_scorer_app/views/screens/scorecard/scorecard_screen.dart';
 import 'package:cricket_scorer_app/views/screens/scoring/scoring_screen.dart';
+import 'package:cricket_scorer_app/views/screens/home/public_matches_screen.dart';
 import 'package:cricket_scorer_app/views/screens/home/settings_screen.dart';
 
 // 60Score v1.1.2 Matches screen: status tabs, filters, and match cards
@@ -546,90 +547,134 @@ class _ScorerHomeScreenState extends State<ScorerHomeScreen> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Matches',
-                      style: TextStyle(
-                        color: PitchTheme.onSurface,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: liveMatches > 0
-                            ? PitchTheme.error.withValues(alpha: 0.12)
-                            : PitchTheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        liveMatches > 0 ? '$liveMatches LIVE' : '$totalMatches Total',
-                        style: TextStyle(
-                          color: liveMatches > 0
-                              ? PitchTheme.error
-                              : PitchTheme.secondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.4,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'My Matches',
+                          style: TextStyle(
+                            color: PitchTheme.onSurface,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: liveMatches > 0
+                                ? PitchTheme.error.withValues(alpha: 0.12)
+                                : PitchTheme.surfaceContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            liveMatches > 0 ? '$liveMatches LIVE' : '$totalMatches Total',
+                            style: TextStyle(
+                              color: liveMatches > 0
+                                  ? PitchTheme.error
+                                  : PitchTheme.secondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    const Text(
+                      'Your fixtures & score records',
+                      style: TextStyle(
+                        color: PitchTheme.outline,
+                        fontSize: 12.5,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 3),
-                const Text(
-                  'View, manage & score fixtures',
-                  style: TextStyle(
-                    color: PitchTheme.outline,
-                    fontSize: 12.5,
+              ),
+              Builder(
+                builder: (btnCtx) => ElevatedButton(
+                  onPressed: () => _showNewMatchMenu(btnCtx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: PitchTheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.add, size: 18, color: PitchTheme.tertiaryFixed),
+                      SizedBox(width: 5),
+                      Text(
+                        'New Match',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(Icons.arrow_drop_down, size: 18),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Builder(
-            builder: (btnCtx) => ElevatedButton(
-              onPressed: () => _showNewMatchMenu(btnCtx),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: PitchTheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
+          const SizedBox(height: 10),
+          InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PublicMatchesScreen(store: store),
+              ),
+            ),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: PitchTheme.secondaryContainer.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: PitchTheme.secondary.withValues(alpha: 0.25),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                elevation: 0,
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: const [
-                  Icon(Icons.add, size: 18, color: PitchTheme.tertiaryFixed),
-                  SizedBox(width: 5),
-                  Text(
-                    'New Match',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
+                  Icon(Icons.public, size: 15, color: PitchTheme.secondary),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Explore All Public & Live Matches on 60Score',
+                      style: TextStyle(
+                        color: PitchTheme.secondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  SizedBox(width: 2),
-                  Icon(Icons.arrow_drop_down, size: 18),
+                  Icon(Icons.arrow_forward_ios, size: 11, color: PitchTheme.secondary),
                 ],
               ),
             ),
