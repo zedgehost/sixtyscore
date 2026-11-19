@@ -55,6 +55,7 @@ import 'package:cricket_scorer_app/views/screens/scorecard/scorecard_screen.dart
 import 'package:cricket_scorer_app/views/screens/scoring/scoring_screen.dart';
 
 import 'package:cricket_scorer_app/views/widgets/app_logo.dart';
+import 'package:cricket_scorer_app/services/sync/live_match_telemetry_hub.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -217,6 +218,9 @@ class _SplashGateState extends State<SplashGate> with WidgetsBindingObserver {
       // Daily automatic backup (keeps last 14) — fire and forget.
 
       runDailyAutoBackup(store);
+
+      // Start Realtime Match Telemetry Hub (syncs live scores & flushes offline outbox)
+      unawaited(LiveMatchTelemetryHub.instance.init(store));
     } catch (_) {
       // Launch hardening: a failure during boot (corrupt local
 

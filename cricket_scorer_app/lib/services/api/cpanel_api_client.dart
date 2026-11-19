@@ -216,10 +216,30 @@ class CpanelApiClient {
     return _post('/matches/$id/live-push', liveData);
   }
 
-  /// Fast live state check with delta timestamp support
-  Future<Map<String, dynamic>> getLiveState(String id, {int? since}) async {
-    final query = since != null && since > 0 ? '?since=$since' : '';
+  /// Fast live state check with delta revision, events count, and timestamp support
+  Future<Map<String, dynamic>> getLiveState(
+    String id, {
+    int? since,
+    int? revision,
+    int? eventsCount,
+  }) async {
+    final params = <String>[];
+    if (since != null && since > 0) params.add('since=$since');
+    if (revision != null && revision > 0) params.add('revision=$revision');
+    if (eventsCount != null && eventsCount >= 0) params.add('events=$eventsCount');
+    final query = params.isNotEmpty ? '?${params.join('&')}' : '';
     return _get('/matches/$id/live-state$query');
+  }
+
+  /// Lightweight connectivity probe (checks true internet access against backend)
+  Future<bool> checkNetworkConnectivity() async {
+    try {
+      final uri = Uri.parse('$_baseUrl/health');
+      final res = await _client.get(uri).timeout(const Duration(milliseconds: 1800));
+      return res.statusCode >= 200 && res.statusCode < 300;
+    } catch (_) {
+      return false;
+    }
   }
 
   // ---------------- 100% OFFLINE-FIRST 2-WAY SYNC ----------------

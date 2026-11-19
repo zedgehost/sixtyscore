@@ -28,6 +28,7 @@ import 'package:cricket_scorer_app/views/screens/teams/profile_screen.dart';
 import 'package:cricket_scorer_app/views/screens/teams/teams_screen.dart';
 import 'package:cricket_scorer_app/views/screens/tournament/tournaments_screen.dart';
 import 'package:cricket_scorer_app/views/widgets/guest_guard.dart';
+import 'package:cricket_scorer_app/services/sync/live_match_telemetry_hub.dart';
 
 class HomeScreen extends StatefulWidget {
   final Store store;
@@ -76,6 +77,7 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
     store.addListener(_onStoreChanged);
+    LiveMatchTelemetryHub.instance.addListener(_onStoreChanged);
 
     _pulseController = AnimationController(
       vsync: this,
@@ -108,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen>
     _pulseController.dispose();
     _searchController.dispose();
     store.removeListener(_onStoreChanged);
+    LiveMatchTelemetryHub.instance.removeListener(_onStoreChanged);
     super.dispose();
   }
 
@@ -271,6 +274,14 @@ class _HomeScreenState extends State<HomeScreen>
           _loadingFeed = false;
           _feedOffline = false;
         });
+
+        // Watch active live matches in background telemetry hub
+        if (liveList.isNotEmpty) {
+          LiveMatchTelemetryHub.instance.watchMatches(
+            liveList.map((m) => m.id).toList(),
+            store: store,
+          );
+        }
 
         try {
           final prefs = await SharedPreferences.getInstance();

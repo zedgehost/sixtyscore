@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import 'package:cricket_scorer_app/models/models.dart';
 import 'package:cricket_scorer_app/core/utils/nav_memory.dart';
-import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 import 'package:cricket_scorer_app/services/export/pdf_export.dart';
 import 'package:cricket_scorer_app/services/share/poster_summary.dart';
 import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
@@ -21,6 +20,7 @@ import 'package:cricket_scorer_app/views/widgets/player_avatar.dart';
 import 'package:cricket_scorer_app/views/widgets/potm_picker.dart';
 import 'package:cricket_scorer_app/views/screens/teams/profile_screen.dart';
 import 'package:cricket_scorer_app/views/screens/tournament/tournament_detail_screen.dart';
+import 'package:cricket_scorer_app/services/sync/live_match_telemetry_hub.dart';
 
 class ScorecardScreen extends StatefulWidget {
   final Store store;
@@ -40,136 +40,30 @@ class ScorecardScreen extends StatefulWidget {
 class _ScorecardScreenState extends State<ScorecardScreen> {
   Store get store => widget.store;
   late Match match;
-  Timer? _liveAutoPollTimer;
-  bool _isAutoPolling = false;
-  int _lastServerEpoch = 0;
 
   @override
   void initState() {
     super.initState();
     match = widget.store.matchById(widget.match.id) ?? widget.match;
-    _startLivePollingIfNeeded();
+    // Centralized Realtime Telemetry: accelerate polling to 2.2s heartbeat
+    LiveMatchTelemetryHub.instance.setFocusedMatch(widget.match.id, store: widget.store);
+    LiveMatchTelemetryHub.instance.addListener(_onHubNotification);
   }
 
-  void _startLivePollingIfNeeded() {
-    _liveAutoPollTimer?.cancel();
-    if (match.status == 'live') {
-      _liveAutoPollTimer = Timer.periodic(
-        const Duration(seconds: 3),
-        (_) => _autoPollLiveUpdates(),
-      );
-    }
-  }
-
-  Future<void> _autoPollLiveUpdates() async {
-    if (!mounted || _isAutoPolling) return;
-    _isAutoPolling = true;
-    try {
-      // 1. Check local store in case local scorer or another tab updated it
-      final local = widget.store.matchById(widget.match.id);
-      if (local != null && local != match) {
-        if (mounted) {
-          setState(() {
-            match = local;
-          });
-        }
-      }
-
-      // 2. Fetch live match details from cPanel cloud in background
-      final client = CpanelApiClient();
-      await client.init();
-      final res = await client.getLiveState(widget.match.id, since: _lastServerEpoch);
-      final isSuccess = res['status'] == 'success' || res['success'] == true;
-      if (isSuccess && res['data'] != null && res['data'] is Map) {
-        final data = Map<String, dynamic>.from(res['data'] as Map);
-        if (data['modified'] == false) {
-          return; // No new balls recorded on server since last check
-        }
-
-        _lastServerEpoch = (data['updated_at_epoch'] as num?)?.toInt() ?? _lastServerEpoch;
-        final payloadCandidate = data['payload'];
-        final rawPayload = payloadCandidate is Map && payloadCandidate.isNotEmpty
-            ? payloadCandidate
-            : data;
-
-        if (rawPayload.isNotEmpty) {
-          final updated = Match.fromJson(Map<String, dynamic>.from(rawPayload));
-
-          // Hydrate squads & player names if returned by backend
-          final teamsData = data['teams'];
-          if (teamsData is List) {
-            for (final tItem in teamsData) {
-              if (tItem is Map) {
-                final tMap = Map<String, dynamic>.from(tItem);
-                final tId = (tMap['id'] ?? '').toString();
-                final tName = (tMap['name'] ?? '').toString();
-                final existingTeam = widget.store.teamById(tId);
-                final squad = <Player>[];
-                if (tMap['players'] is List) {
-                  for (final pItem in (tMap['players'] as List)) {
-                    if (pItem is Map) {
-                      final pMap = Map<String, dynamic>.from(pItem);
-                      final pId = (pMap['id'] ?? '').toString();
-                      final pName = (pMap['name'] ?? 'Player').toString();
-                      final player = Player(
-                        id: pId,
-                        name: pName,
-                        jerseyNo: (pMap['jerseyNo'] as num?)?.toInt() ?? 0,
-                        role: (pMap['role'] ?? 'Batter').toString(),
-                        battingStyle: (pMap['battingStyle'] ?? 'Right-hand').toString(),
-                        bowlingStyle: (pMap['bowlingStyle'] ?? 'None').toString(),
-                        userCode: (pMap['userCode'] ?? '').toString(),
-                        isVerified: pMap['isVerified'] == true,
-                      );
-                      squad.add(player);
-                      if (existingTeam != null && existingTeam.playerById(pId) == null) {
-                        existingTeam.players.add(player);
-                      }
-                    }
-                  }
-                }
-                if (existingTeam == null && tId.isNotEmpty) {
-                  widget.store.teams.add(Team(
-                    id: tId,
-                    name: tName,
-                    players: squad,
-                  ));
-                }
-              }
-            }
-          }
-
-          if (widget.store.isRemotePreview) {
-            final idx = widget.store.matches.indexWhere((x) => x.id == updated.id);
-            if (idx >= 0) {
-              widget.store.matches[idx] = updated;
-            } else {
-              widget.store.matches.add(updated);
-            }
-          } else {
-            await widget.store.upsertMatch(updated);
-          }
-
-          if (mounted) {
-            setState(() {
-              match = updated;
-            });
-            if (match.status != 'live') {
-              _liveAutoPollTimer?.cancel();
-            }
-          }
-        }
-      }
-    } catch (_) {
-      // Silent error: offline-first ensures app never crashes if offline
-    } finally {
-      _isAutoPolling = false;
+  void _onHubNotification() {
+    if (!mounted) return;
+    final updated = widget.store.matchById(widget.match.id);
+    if (updated != null && updated != match) {
+      setState(() {
+        match = updated;
+      });
     }
   }
 
   @override
   void dispose() {
-    _liveAutoPollTimer?.cancel();
+    LiveMatchTelemetryHub.instance.removeListener(_onHubNotification);
+    LiveMatchTelemetryHub.instance.clearFocusedMatch(widget.match.id);
     super.dispose();
   }
 

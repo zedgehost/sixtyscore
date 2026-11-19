@@ -14,12 +14,12 @@ import 'package:cricket_scorer_app/core/utils/nav_memory.dart';
 import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/domain/tournament/tournament_engine.dart';
 import 'package:cricket_scorer_app/models/models.dart';
-import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/share/points_table_share.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
 import 'package:cricket_scorer_app/services/sync/publish_service.dart';
+import 'package:cricket_scorer_app/services/sync/live_match_telemetry_hub.dart';
 import 'package:cricket_scorer_app/views/screens/draft/draft_screen.dart';
 import 'package:cricket_scorer_app/views/screens/scorecard/scorecard_screen.dart';
 import 'package:cricket_scorer_app/views/screens/scoring/match_setup_screen.dart';
@@ -72,15 +72,22 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   void _startLiveTournamentPolling() {
-    _liveTournamentPollTimer?.cancel();
-    _liveTournamentPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      _pollTournamentMatches();
-    });
-    _pollTournamentMatches();
+    final tMatchIds = store.matches
+        .where((m) => m.tournamentId == tournament.id)
+        .map((m) => m.id)
+        .toList();
+    LiveMatchTelemetryHub.instance.watchMatches(tMatchIds, store: store);
+    LiveMatchTelemetryHub.instance.addListener(_onStoreChanged);
   }
 
   @override
   void dispose() {
+    final tMatchIds = store.matches
+        .where((m) => m.tournamentId == tournament.id)
+        .map((m) => m.id)
+        .toList();
+    LiveMatchTelemetryHub.instance.unwatchMatches(tMatchIds);
+    LiveMatchTelemetryHub.instance.removeListener(_onStoreChanged);
     _liveTournamentPollTimer?.cancel();
     store.removeListener(_onStoreChanged);
     NavMemory.clear('tournament', tournament.id);
@@ -95,42 +102,11 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     if (!mounted || _isPollingTournament) return;
     _isPollingTournament = true;
     try {
-      final client = CpanelApiClient();
-      await client.init();
-      final res = await client.getLiveMatches();
-      final isSuccess = res['status'] == 'success' || res['success'] == true;
-      if (isSuccess && res['data'] is List) {
-        bool changed = false;
-        for (final item in (res['data'] as List)) {
-          if (item is Map) {
-            final itemMap = Map<String, dynamic>.from(item);
-            final mId = (itemMap['id'] ?? '').toString();
-            final tId = (itemMap['tournament_id'] ?? itemMap['tournamentId'] ?? '').toString();
-            if (tId == tournament.id || store.matches.any((x) => x.id == mId && x.tournamentId == tournament.id)) {
-              final detailRes = await client.getLiveState(mId);
-              final dSuccess = detailRes['status'] == 'success' || detailRes['success'] == true;
-              if (dSuccess && detailRes['data'] is Map) {
-                final dData = Map<String, dynamic>.from(detailRes['data'] as Map);
-                if (dData['modified'] != false) {
-                  final pLoad = dData['payload'];
-                  final rawPayload = pLoad is Map && pLoad.isNotEmpty
-                      ? pLoad
-                      : dData;
-                  if (rawPayload.isNotEmpty) {
-                    final updated = Match.fromJson(Map<String, dynamic>.from(rawPayload));
-                    await store.upsertMatch(updated);
-                    changed = true;
-                  }
-                }
-              }
-            }
-          }
-        }
-        if (changed && mounted) {
-          setState(() {});
-        }
-      }
-    } catch (_) {
+      final tMatchIds = store.matches
+          .where((m) => m.tournamentId == tournament.id)
+          .map((m) => m.id)
+          .toList();
+      LiveMatchTelemetryHub.instance.watchMatches(tMatchIds, store: store);
     } finally {
       _isPollingTournament = false;
     }

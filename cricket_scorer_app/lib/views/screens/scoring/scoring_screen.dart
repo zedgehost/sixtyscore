@@ -23,6 +23,7 @@ import 'package:cricket_scorer_app/views/screens/tournament/tournament_detail_sc
 import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
+import 'package:cricket_scorer_app/services/sync/live_match_telemetry_hub.dart';
 
 class ScoringScreen extends StatefulWidget {
   final Store store;
@@ -168,44 +169,8 @@ class _ScoringScreenState extends State<ScoringScreen> {
       }
       await _runPlayoffUpdate();
 
-      // Instant Live Micro-Push: sends ball-by-ball update in ~50ms to cPanel
-      unawaited(() async {
-        try {
-          final client = CpanelApiClient();
-          await client.init();
-          if (client.token != null && client.token!.isNotEmpty) {
-            final nowEpoch = DateTime.now().millisecondsSinceEpoch;
-            await client.pushLiveScore(match.id, {
-              'id': match.id,
-              'status': match.status,
-              'stage': match.stage,
-              'result_text': match.resultText,
-              'tournament_id': match.tournamentId,
-              'team_a_id': match.teamAId,
-              'team_b_id': match.teamBId,
-              'team_a_name': store.teamName(match.teamAId),
-              'team_b_name': store.teamName(match.teamBId),
-              'overs_limit': match.oversLimit,
-              'balls_per_over': match.ballsPerOver,
-              'venue': match.venue,
-              'date_iso': match.dateIso,
-              'toss_winner_id': match.tossWinnerId,
-              'toss_decision': match.tossDecision,
-              'match_title': match.matchTitle,
-              'ball_type': match.ballType,
-              'updated_at_epoch': nowEpoch,
-              'payload': {
-                ...match.toJson(),
-                'teamAName': store.teamName(match.teamAId),
-                'teamBName': store.teamName(match.teamBId),
-                'updatedAtEpoch': nowEpoch,
-              },
-            });
-          }
-          // Also schedule debounced full batch sync for overall database consistency
-          CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
-        } catch (_) {}
-      }());
+      // Centralized Telemetry Micro-Push (with offline-outbox & reconnect recovery)
+      unawaited(LiveMatchTelemetryHub.instance.onMatchScored(match));
     } catch (e, st) {
       // Silent-close guard: _afterChange runs inside _record,
       // which every ball button calls WITHOUT await — a throw
