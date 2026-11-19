@@ -42,6 +42,7 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
   bool get isOnline => _isOnline;
   int get pendingOutboxCount => _offlineOutbox.length;
   Match? getLiveMatch(String id) => _liveMatches[id];
+  List<Match> get allLiveMatches => _liveMatches.values.toList();
 
   /// Initialize the telemetry hub with the root store and restore any pending offline outbox
   Future<void> init(Store store) async {
@@ -49,6 +50,12 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
     await _apiClient.init();
     await _loadPersistedOutbox();
     _startNetworkHeartbeat();
+
+    final localLive = store.matches.where((m) => m.status == 'live').map((m) => m.id).toList();
+    if (localLive.isNotEmpty) {
+      _watchedMatchIds.addAll(localLive);
+      _startBackgroundPolling();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -59,6 +66,7 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
   /// Dispatches immediately to cPanel if online, or buffers in offline outbox if offline.
   Future<void> onMatchScored(Match match) async {
     _liveMatches[match.id] = match;
+    notifyListeners();
     if (_store == null) return;
 
     final nowEpoch = DateTime.now().millisecondsSinceEpoch;
@@ -257,7 +265,7 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
 
   void _startBackgroundPolling() {
     _backgroundPollTimer?.cancel();
-    _backgroundPollTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
+    _backgroundPollTimer = Timer.periodic(const Duration(milliseconds: 1800), (_) {
       _pollWatchedMatches();
     });
   }

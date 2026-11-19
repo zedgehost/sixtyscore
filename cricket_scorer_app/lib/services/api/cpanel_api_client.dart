@@ -242,6 +242,16 @@ class CpanelApiClient {
     }
   }
 
+  // ---------------- TOURNAMENTS ----------------
+
+  Future<Map<String, dynamic>> searchTournaments(String query, {int limit = 25}) async {
+    return _get('/tournaments/public?q=${Uri.encodeComponent(query)}&limit=$limit');
+  }
+
+  Future<Map<String, dynamic>> getTournamentDetail(String id) async {
+    return _get('/tournaments/${Uri.encodeComponent(id)}');
+  }
+
   // ---------------- 100% OFFLINE-FIRST 2-WAY SYNC ----------------
 
   Future<Map<String, dynamic>> batchSync({

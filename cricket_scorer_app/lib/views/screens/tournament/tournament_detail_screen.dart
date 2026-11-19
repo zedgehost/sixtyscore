@@ -571,7 +571,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   Widget _fixtureCard(Match rawM, {String? stageOverride}) {
-    final m = store.matchById(rawM.id) ?? rawM;
+    final m = LiveMatchTelemetryHub.instance.getLiveMatch(rawM.id) ?? store.matchById(rawM.id) ?? rawM;
     final hasWinnerResult = m.resultText.isNotEmpty && m.status != 'noResult';
     final hasBothInningsDone = m.innings.length >= 2 && m.innings[1].isComplete;
     final isMatchCompleted = m.status == 'completed' || hasWinnerResult || hasBothInningsDone;
@@ -610,28 +610,41 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     String? teamAScoreText;
     String? teamBScoreText;
     if (m.status == 'live' || effectiveStatus == 'completed') {
-      if (m.innings.isNotEmpty) {
-        final inn1 = m.innings[0];
-        final inn1TeamId = inn1.battingTeamId;
-        final oversStr = '${inn1.legalBalls ~/ 6}.${inn1.legalBalls % 6}';
-        final scoreStr = '${inn1.totalRuns}/${inn1.wickets} ($oversStr)';
-        if (inn1TeamId == m.teamAId) {
-          teamAScoreText = scoreStr;
-        } else {
-          teamBScoreText = scoreStr;
+      InningsState? innA;
+      InningsState? innB;
+
+      for (final inn in m.innings) {
+        final bId = inn.battingTeamId.trim();
+        if (bId.isNotEmpty) {
+          if (bId == m.teamAId && innA == null) innA = inn;
+          if (bId == m.teamBId && innB == null) innB = inn;
         }
       }
-      if (m.innings.length > 1) {
-        final inn2 = m.innings[1];
-        final inn2TeamId = inn2.battingTeamId;
-        final oversStr = '${inn2.legalBalls ~/ 6}.${inn2.legalBalls % 6}';
-        final scoreStr = '${inn2.totalRuns}/${inn2.wickets} ($oversStr)';
-        if (inn2TeamId == m.teamAId) {
-          teamAScoreText = scoreStr;
+
+      if (innA == null && innB == null && m.innings.isNotEmpty) {
+        final teamABatsFirst = m.battingFirstId == m.teamAId;
+        if (teamABatsFirst) {
+          innA = m.innings[0];
+          if (m.innings.length > 1) innB = m.innings[1];
         } else {
-          teamBScoreText = scoreStr;
+          innB = m.innings[0];
+          if (m.innings.length > 1) innA = m.innings[1];
         }
+      } else if (innA != null && innB == null && m.innings.length > 1) {
+        innB = m.innings.firstWhere((i) => i != innA, orElse: () => m.innings[1]);
+      } else if (innB != null && innA == null && m.innings.length > 1) {
+        innA = m.innings.firstWhere((i) => i != innB, orElse: () => m.innings[0]);
       }
+
+      if (innA != null) {
+        final oversStr = '${innA.legalBalls ~/ 6}.${innA.legalBalls % 6}';
+        teamAScoreText = '${innA.totalRuns}/${innA.wickets} ($oversStr)';
+      }
+      if (innB != null) {
+        final oversStr = '${innB.legalBalls ~/ 6}.${innB.legalBalls % 6}';
+        teamBScoreText = '${innB.totalRuns}/${innB.wickets} ($oversStr)';
+      }
+
       // If live and one team hasn't batted yet, show "Yet to bat" or "0/0 (0.0)"
       if (m.status == 'live') {
         teamAScoreText ??= m.innings.isEmpty

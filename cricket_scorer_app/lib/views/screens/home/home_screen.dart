@@ -127,6 +127,7 @@ class _HomeScreenState extends State<HomeScreen>
   List<RemoteMatchSummary> _remoteRecent = [];
   List<Team> _remoteTeams = [];
   List<Player> _remotePlayers = [];
+  List<Tournament> _remoteTournaments = [];
   bool _searchingRemote = false;
   bool _loadingFeed = false;
   bool _feedOffline = false;
@@ -159,7 +160,8 @@ class _HomeScreenState extends State<HomeScreen>
 
     _loadCachedFeed();
     _fetchLiveFeed(silent: true);
-    _feedTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+    // Real-time live feed polling: 3.5 seconds when active
+    _feedTimer = Timer.periodic(const Duration(milliseconds: 3500), (_) {
       if (mounted) _fetchLiveFeed(silent: true);
     });
   }
@@ -182,6 +184,7 @@ class _HomeScreenState extends State<HomeScreen>
         setState(() {
           _remoteTeams = [];
           _remotePlayers = [];
+          _remoteTournaments = [];
           _searchingRemote = false;
         });
       }
@@ -205,6 +208,7 @@ class _HomeScreenState extends State<HomeScreen>
         final resTeams = await client.searchTeams(q);
         final foundTeams = <Team>[];
         final foundPlayers = <Player>[];
+        final foundTournaments = <Tournament>[];
 
         if (resTeams['status'] == 'success' && resTeams['data'] is List) {
           for (final item in (resTeams['data'] as List)) {
@@ -256,10 +260,36 @@ class _HomeScreenState extends State<HomeScreen>
           }
         }
 
+        // Hit tournament search API
+        final resTournaments = await client.searchTournaments(q);
+        if (resTournaments['status'] == 'success' && resTournaments['data'] is List) {
+          for (final item in (resTournaments['data'] as List)) {
+            if (item is Map) {
+              final tm = Map<String, dynamic>.from(item);
+              final payload = tm['payload'] is Map ? Map<String, dynamic>.from(tm['payload'] as Map) : null;
+              if (payload != null && payload.isNotEmpty) {
+                try {
+                  foundTournaments.add(Tournament.fromJson(payload));
+                  continue;
+                } catch (_) {}
+              }
+              foundTournaments.add(Tournament(
+                id: (tm['id'] ?? '').toString(),
+                name: (tm['name'] ?? 'Tournament').toString(),
+                venue: (tm['venue'] ?? '').toString(),
+                format: (tm['format'] ?? 'Round Robin').toString(),
+                creatorId: (tm['owner_uid'] ?? '').toString(),
+                published: (tm['status'] ?? '') == 'published' || (tm['is_published'] ?? 0) == 1,
+              ));
+            }
+          }
+        }
+
         if (mounted && _searchQuery.isNotEmpty) {
           setState(() {
             _remoteTeams = foundTeams;
             _remotePlayers = foundPlayers;
+            _remoteTournaments = foundTournaments;
             _searchingRemote = false;
           });
         }
@@ -336,10 +366,16 @@ class _HomeScreenState extends State<HomeScreen>
           _feedOffline = false;
         });
 
-        // Watch active live matches in background telemetry hub
-        if (liveList.isNotEmpty) {
+        // Watch ALL active live matches (remote feed + local store + hub memory) in telemetry hub
+        final allLiveIds = <String>{
+          ...liveList.map((m) => m.id),
+          ...store.matches.where((m) => m.status == 'live').map((m) => m.id),
+          ...LiveMatchTelemetryHub.instance.allLiveMatches.where((m) => m.status == 'live').map((m) => m.id),
+        }.where((id) => id.isNotEmpty).toList();
+
+        if (allLiveIds.isNotEmpty) {
           LiveMatchTelemetryHub.instance.watchMatches(
-            liveList.map((m) => m.id).toList(),
+            allLiveIds,
             store: store,
           );
         }
@@ -793,12 +829,23 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
 
-    // 4. Tournaments (by Name, Venue or ID)
+    // 4. Tournaments (by Name, Venue or ID - Local + Remote)
+    final localTournIds = store.tournaments.map((t) => t.id).toSet();
     final matchedTournaments = store.tournaments.where((t) {
       return t.name.toLowerCase().contains(query) ||
           t.venue.toLowerCase().contains(query) ||
           t.id.toLowerCase().contains(query);
     }).toList();
+
+    for (final rt in _remoteTournaments) {
+      if (!localTournIds.contains(rt.id)) {
+        if (rt.name.toLowerCase().contains(query) ||
+            rt.venue.toLowerCase().contains(query) ||
+            rt.id.toLowerCase().contains(query)) {
+          matchedTournaments.add(rt);
+        }
+      }
+    }
 
     final totalResults = matchedMatches.length +
         matchedRemote.length +
@@ -1277,10 +1324,14 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: PitchTheme.outline),
         onTap: () {
+          if (store.tournamentById(tr.id) == null) {
+            store.tournaments.add(tr);
+          }
+          final activeTr = store.tournamentById(tr.id) ?? tr;
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => TournamentDetailScreen(store: store, tournament: tr),
+              builder: (_) => TournamentDetailScreen(store: store, tournament: activeTr),
             ),
           );
         },
@@ -1485,6 +1536,15 @@ class _HomeScreenState extends State<HomeScreen>
     for (final rm in _remoteLive) {
       if (matchesQuery(rm.teamAName, rm.teamBName, rm.matchTitle, rm.venue)) {
         liveMap[rm.id] = _resolveMatchItem(remote: rm);
+      }
+    }
+    for (final m in LiveMatchTelemetryHub.instance.allLiveMatches) {
+      if (m.status == 'live') {
+        final a = store.teamName(m.teamAId);
+        final b = store.teamName(m.teamBId);
+        if (matchesQuery(a, b, m.matchTitle, m.venue)) {
+          liveMap[m.id] = _resolveMatchItem(match: m, remote: liveMap[m.id]?.remoteSummary);
+        }
       }
     }
     for (final m in store.matches) {
@@ -1792,21 +1852,27 @@ class _HomeScreenState extends State<HomeScreen>
       InningsState? innB;
 
       for (final inn in freshM.innings) {
-        if (inn.battingTeamId.isNotEmpty) {
-          if (inn.battingTeamId == teamAId && innA == null) innA = inn;
-          if (inn.battingTeamId == teamBId && innB == null) innB = inn;
+        final bId = inn.battingTeamId.trim();
+        if (bId.isNotEmpty) {
+          if (bId == teamAId && innA == null) innA = inn;
+          if (bId == teamBId && innB == null) innB = inn;
         }
       }
 
-      if (innA == null || innB == null) {
-        final teamABattedFirst = (freshM.tossWinnerId == teamAId && freshM.tossDecision != 'bowl') ||
-            (freshM.tossWinnerId == teamBId && freshM.tossDecision == 'bowl');
-        innA ??= teamABattedFirst
-            ? freshM.innings[0]
-            : (freshM.innings.length > 1 ? freshM.innings[1] : null);
-        innB ??= !teamABattedFirst
-            ? freshM.innings[0]
-            : (freshM.innings.length > 1 ? freshM.innings[1] : null);
+      // Positional fallback ONLY if neither team was identified by battingTeamId:
+      if (innA == null && innB == null) {
+        final teamABatsFirst = freshM.battingFirstId == teamAId;
+        if (teamABatsFirst) {
+          innA = freshM.innings[0];
+          if (freshM.innings.length > 1) innB = freshM.innings[1];
+        } else {
+          innB = freshM.innings[0];
+          if (freshM.innings.length > 1) innA = freshM.innings[1];
+        }
+      } else if (innA != null && innB == null && freshM.innings.length > 1) {
+        innB = freshM.innings.firstWhere((i) => i != innA, orElse: () => freshM.innings[1]);
+      } else if (innB != null && innA == null && freshM.innings.length > 1) {
+        innA = freshM.innings.firstWhere((i) => i != innB, orElse: () => freshM.innings[0]);
       }
 
       final activeInn = freshM.innings.last;
@@ -1827,26 +1893,46 @@ class _HomeScreenState extends State<HomeScreen>
       }
 
       if (isLive) {
-        if (activeInn == innA) {
+        final curBattingId = activeInn.battingTeamId.trim();
+        if (curBattingId.isNotEmpty) {
+          isTeamABatting = curBattingId == teamAId;
+          isTeamBBatting = curBattingId == teamBId;
+        } else if (activeInn == innA) {
           isTeamABatting = true;
+          isTeamBBatting = false;
         } else if (activeInn == innB) {
-          isTeamBBatting = true;
-        } else if (activeInn.battingTeamId.isNotEmpty && activeInn.battingTeamId == teamAId) {
-          isTeamABatting = true;
-        } else if (activeInn.battingTeamId.isNotEmpty && activeInn.battingTeamId == teamBId) {
+          isTeamABatting = false;
           isTeamBBatting = true;
         } else {
-          isTeamABatting = (freshM.innings.length == 1);
-          isTeamBBatting = (freshM.innings.length > 1);
+          final teamABatsFirst = freshM.battingFirstId == teamAId;
+          isTeamABatting = (freshM.innings.length == 1) ? teamABatsFirst : !teamABatsFirst;
+          isTeamBBatting = (freshM.innings.length == 1) ? !teamABatsFirst : teamABatsFirst;
         }
       }
     } else if (rm != null && rm.innings.isNotEmpty) {
-      InningsScoreSummary? innA = rm.inningsForTeam(teamAId);
-      InningsScoreSummary? innB = rm.inningsForTeam(teamBId);
+      InningsScoreSummary? innA;
+      InningsScoreSummary? innB;
+
+      for (final inn in rm.innings) {
+        final bId = inn.battingTeamId.trim();
+        if (bId.isNotEmpty) {
+          if (bId == teamAId && innA == null) innA = inn;
+          if (bId == teamBId && innB == null) innB = inn;
+        }
+      }
 
       if (innA == null && innB == null) {
-        innA = rm.innings[0];
-        if (rm.innings.length > 1) innB = rm.innings[1];
+        if (rm.innings.length >= 2) {
+          innA = rm.innings[0];
+          innB = rm.innings[1];
+        } else {
+          final singleInn = rm.innings[0];
+          if (singleInn.target > 0) {
+            innB = singleInn;
+          } else {
+            innA = singleInn;
+          }
+        }
       } else if (innA != null && innB == null && rm.innings.length > 1) {
         innB = rm.innings.firstWhere((i) => i != innA, orElse: () => rm.innings[1]);
       } else if (innB != null && innA == null && rm.innings.length > 1) {
@@ -1866,13 +1952,15 @@ class _HomeScreenState extends State<HomeScreen>
       }
 
       if (isLive) {
-        if (activeInn == innA) {
+        final curBattingId = activeInn.battingTeamId.trim();
+        if (curBattingId.isNotEmpty) {
+          isTeamABatting = curBattingId == teamAId;
+          isTeamBBatting = curBattingId == teamBId;
+        } else if (activeInn == innA) {
           isTeamABatting = true;
+          isTeamBBatting = false;
         } else if (activeInn == innB) {
-          isTeamBBatting = true;
-        } else if (activeInn.battingTeamId.isNotEmpty && activeInn.battingTeamId == teamAId) {
-          isTeamABatting = true;
-        } else if (activeInn.battingTeamId.isNotEmpty && activeInn.battingTeamId == teamBId) {
+          isTeamABatting = false;
           isTeamBBatting = true;
         } else {
           isTeamABatting = (rm.innings.length == 1);
