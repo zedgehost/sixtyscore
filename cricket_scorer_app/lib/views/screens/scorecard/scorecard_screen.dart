@@ -21,6 +21,7 @@ import 'package:cricket_scorer_app/views/widgets/potm_picker.dart';
 import 'package:cricket_scorer_app/views/screens/teams/profile_screen.dart';
 import 'package:cricket_scorer_app/views/screens/tournament/tournament_detail_screen.dart';
 import 'package:cricket_scorer_app/services/sync/live_match_telemetry_hub.dart';
+import 'package:cricket_scorer_app/main.dart' show HomeShell;
 
 class ScorecardScreen extends StatefulWidget {
   final Store store;
@@ -90,6 +91,10 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
   }
 
   void _handleBack(BuildContext context) {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
     final tid = match.tournamentId;
     if (tid != null && tid.isNotEmpty) {
       final t = store.tournamentById(tid);
@@ -103,7 +108,10 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
         return;
       }
     }
-    Navigator.of(context).maybePop();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => HomeShell(store: store)),
+      (route) => false,
+    );
   }
 
   @override
@@ -133,7 +141,7 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
             match.canUserScore(store.effectiveUserId,
                 userCode: store.effectiveUserCode));
     return PopScope(
-      canPop: match.tournamentId == null || match.tournamentId!.isEmpty,
+      canPop: true,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         _handleBack(context);

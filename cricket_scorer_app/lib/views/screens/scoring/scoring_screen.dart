@@ -24,6 +24,7 @@ import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
 import 'package:cricket_scorer_app/services/sync/live_match_telemetry_hub.dart';
+import 'package:cricket_scorer_app/main.dart' show HomeShell;
 
 class ScoringScreen extends StatefulWidget {
   final Store store;
@@ -113,6 +114,11 @@ class _ScoringScreenState extends State<ScoringScreen> {
     store.persistMatchesOnly();
     CpanelSyncService.triggerAutoSyncFor(store);
 
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+
     final tid = match.tournamentId;
     if (tid != null && tid.isNotEmpty) {
       final t = store.tournamentById(tid);
@@ -126,7 +132,10 @@ class _ScoringScreenState extends State<ScoringScreen> {
         return;
       }
     }
-    Navigator.of(context).maybePop();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => HomeShell(store: store)),
+      (route) => false,
+    );
   }
 
   InningsState get inn {
@@ -1237,8 +1246,10 @@ class _ScoringScreenState extends State<ScoringScreen> {
     final ballsLeft = inn.oversLimit * inn.ballsPerOver - inn.legalBalls;
 
     return PopScope(
-      canPop: match.tournamentId == null || match.tournamentId!.isEmpty,
+      canPop: true,
       onPopInvokedWithResult: (didPop, result) {
+        store.persistMatchesOnly();
+        CpanelSyncService.triggerAutoSyncFor(store);
         if (didPop) return;
         _handleBack();
       },
