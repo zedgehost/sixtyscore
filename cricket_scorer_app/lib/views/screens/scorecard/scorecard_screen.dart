@@ -42,6 +42,7 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
   late Match match;
   Timer? _liveAutoPollTimer;
   bool _isAutoPolling = false;
+  int _lastServerEpoch = 0;
 
   @override
   void initState() {
@@ -64,7 +65,7 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
     if (!mounted || _isAutoPolling) return;
     _isAutoPolling = true;
     try {
-      // 1. Check local store in case another tab or local scoring updated it
+      // 1. Check local store in case local scorer or another tab updated it
       final local = widget.store.matchById(widget.match.id);
       if (local != null && local != match) {
         if (mounted) {
@@ -77,12 +78,67 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
       // 2. Fetch live match details from cPanel cloud in background
       final client = CpanelApiClient();
       await client.init();
-      final res = await client.getMatchDetail(widget.match.id);
-      if (res['success'] == true && res['data'] != null) {
-        final data = res['data'];
-        final payload = data['payload'];
-        if (payload is Map && payload.isNotEmpty) {
-          final updated = Match.fromJson(Map<String, dynamic>.from(payload));
+      final res = await client.getLiveState(widget.match.id, since: _lastServerEpoch);
+      final isSuccess = res['status'] == 'success' || res['success'] == true;
+      if (isSuccess && res['data'] != null && res['data'] is Map) {
+        final data = Map<String, dynamic>.from(res['data'] as Map);
+        if (data['modified'] == false) {
+          return; // No new balls recorded on server since last check
+        }
+
+        _lastServerEpoch = (data['updated_at_epoch'] as num?)?.toInt() ?? _lastServerEpoch;
+        final payloadCandidate = data['payload'];
+        final rawPayload = payloadCandidate is Map && payloadCandidate.isNotEmpty
+            ? payloadCandidate
+            : data;
+
+        if (rawPayload.isNotEmpty) {
+          final updated = Match.fromJson(Map<String, dynamic>.from(rawPayload));
+
+          // Hydrate squads & player names if returned by backend
+          final teamsData = data['teams'];
+          if (teamsData is List) {
+            for (final tItem in teamsData) {
+              if (tItem is Map) {
+                final tMap = Map<String, dynamic>.from(tItem);
+                final tId = (tMap['id'] ?? '').toString();
+                final tName = (tMap['name'] ?? '').toString();
+                final existingTeam = widget.store.teamById(tId);
+                final squad = <Player>[];
+                if (tMap['players'] is List) {
+                  for (final pItem in (tMap['players'] as List)) {
+                    if (pItem is Map) {
+                      final pMap = Map<String, dynamic>.from(pItem);
+                      final pId = (pMap['id'] ?? '').toString();
+                      final pName = (pMap['name'] ?? 'Player').toString();
+                      final player = Player(
+                        id: pId,
+                        name: pName,
+                        jerseyNo: (pMap['jerseyNo'] as num?)?.toInt() ?? 0,
+                        role: (pMap['role'] ?? 'Batter').toString(),
+                        battingStyle: (pMap['battingStyle'] ?? 'Right-hand').toString(),
+                        bowlingStyle: (pMap['bowlingStyle'] ?? 'None').toString(),
+                        userCode: (pMap['userCode'] ?? '').toString(),
+                        isVerified: pMap['isVerified'] == true,
+                      );
+                      squad.add(player);
+                      if (existingTeam != null && existingTeam.playerById(pId) == null) {
+                        existingTeam.players.add(player);
+                      }
+                    }
+                  }
+                }
+                if (existingTeam == null && tId.isNotEmpty) {
+                  widget.store.teams.add(Team(
+                    id: tId,
+                    name: tName,
+                    players: squad,
+                  ));
+                }
+              }
+            }
+          }
+
           if (widget.store.isRemotePreview) {
             final idx = widget.store.matches.indexWhere((x) => x.id == updated.id);
             if (idx >= 0) {
@@ -93,6 +149,7 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
           } else {
             await widget.store.upsertMatch(updated);
           }
+
           if (mounted) {
             setState(() {
               match = updated;

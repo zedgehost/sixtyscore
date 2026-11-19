@@ -210,6 +210,18 @@ class CpanelApiClient {
     return _put('/matches/$id', updateData);
   }
 
+  /// Real-time live score push (ultra-fast per-ball transmission)
+  Future<Map<String, dynamic>> pushLiveScore(
+      String id, Map<String, dynamic> liveData) async {
+    return _post('/matches/$id/live-push', liveData);
+  }
+
+  /// Fast live state check with delta timestamp support
+  Future<Map<String, dynamic>> getLiveState(String id, {int? since}) async {
+    final query = since != null && since > 0 ? '?since=$since' : '';
+    return _get('/matches/$id/live-state$query');
+  }
+
   // ---------------- 100% OFFLINE-FIRST 2-WAY SYNC ----------------
 
   Future<Map<String, dynamic>> batchSync({

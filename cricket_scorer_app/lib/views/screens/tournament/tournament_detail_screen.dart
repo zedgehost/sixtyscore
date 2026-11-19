@@ -3,6 +3,7 @@
 // multi-format fixtures, sports telemetry cards, real-time standings,
 // qualification engine, and offline-first cPanel auto-sync.
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ import 'package:cricket_scorer_app/core/utils/nav_memory.dart';
 import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/domain/tournament/tournament_engine.dart';
 import 'package:cricket_scorer_app/models/models.dart';
+import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/share/points_table_share.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
@@ -52,6 +54,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   Tournament get tournament => widget.tournament;
 
   PlayoffUpdate? _playoffUpdate;
+  Timer? _liveTournamentPollTimer;
+  bool _isPollingTournament = false;
 
   @override
   void initState() {
@@ -64,10 +68,20 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       _triggerCloudSync();
     }
     _runPlayoffUpdate();
+    _startLiveTournamentPolling();
+  }
+
+  void _startLiveTournamentPolling() {
+    _liveTournamentPollTimer?.cancel();
+    _liveTournamentPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _pollTournamentMatches();
+    });
+    _pollTournamentMatches();
   }
 
   @override
   void dispose() {
+    _liveTournamentPollTimer?.cancel();
     store.removeListener(_onStoreChanged);
     NavMemory.clear('tournament', tournament.id);
     super.dispose();
@@ -75,6 +89,51 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
 
   void _onStoreChanged() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _pollTournamentMatches() async {
+    if (!mounted || _isPollingTournament) return;
+    _isPollingTournament = true;
+    try {
+      final client = CpanelApiClient();
+      await client.init();
+      final res = await client.getLiveMatches();
+      final isSuccess = res['status'] == 'success' || res['success'] == true;
+      if (isSuccess && res['data'] is List) {
+        bool changed = false;
+        for (final item in (res['data'] as List)) {
+          if (item is Map) {
+            final itemMap = Map<String, dynamic>.from(item);
+            final mId = (itemMap['id'] ?? '').toString();
+            final tId = (itemMap['tournament_id'] ?? itemMap['tournamentId'] ?? '').toString();
+            if (tId == tournament.id || store.matches.any((x) => x.id == mId && x.tournamentId == tournament.id)) {
+              final detailRes = await client.getLiveState(mId);
+              final dSuccess = detailRes['status'] == 'success' || detailRes['success'] == true;
+              if (dSuccess && detailRes['data'] is Map) {
+                final dData = Map<String, dynamic>.from(detailRes['data'] as Map);
+                if (dData['modified'] != false) {
+                  final pLoad = dData['payload'];
+                  final rawPayload = pLoad is Map && pLoad.isNotEmpty
+                      ? pLoad
+                      : dData;
+                  if (rawPayload.isNotEmpty) {
+                    final updated = Match.fromJson(Map<String, dynamic>.from(rawPayload));
+                    await store.upsertMatch(updated);
+                    changed = true;
+                  }
+                }
+              }
+            }
+          }
+        }
+        if (changed && mounted) {
+          setState(() {});
+        }
+      }
+    } catch (_) {
+    } finally {
+      _isPollingTournament = false;
+    }
   }
 
   void _triggerCloudSync() {
@@ -1718,10 +1777,14 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   Widget _buildFixturesTab(List<Match> leagueFixtures, List<Match> playoffFixtures) {
-    return ListView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 90),
-      children: [
+    return RefreshIndicator(
+      onRefresh: _pollTournamentMatches,
+      color: PitchTheme.primary,
+      backgroundColor: PitchTheme.surfaceContainerLowest,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.only(bottom: 90),
+        children: [
         // Tournament Hero Header Banner (displayed exclusively on Fixtures tab)
         _buildTournamentHeroBanner(),
         const SizedBox(height: 14),
@@ -1910,8 +1973,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildPointsTableTab(List<PointsRow> rows, Set<String> qualifierIds) {
     return ListView(

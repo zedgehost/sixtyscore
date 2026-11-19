@@ -168,11 +168,41 @@ class _ScoringScreenState extends State<ScoringScreen> {
       }
       await _runPlayoffUpdate();
 
-      // Non-blocking auto sync on scoring events (debounced 3s, zero UI lag, offline safe)
+      // Instant Live Micro-Push: sends ball-by-ball update in ~50ms to cPanel
       unawaited(() async {
         try {
           final client = CpanelApiClient();
           await client.init();
+          if (client.token != null && client.token!.isNotEmpty) {
+            final nowEpoch = DateTime.now().millisecondsSinceEpoch;
+            await client.pushLiveScore(match.id, {
+              'id': match.id,
+              'status': match.status,
+              'stage': match.stage,
+              'result_text': match.resultText,
+              'tournament_id': match.tournamentId,
+              'team_a_id': match.teamAId,
+              'team_b_id': match.teamBId,
+              'team_a_name': store.teamName(match.teamAId),
+              'team_b_name': store.teamName(match.teamBId),
+              'overs_limit': match.oversLimit,
+              'balls_per_over': match.ballsPerOver,
+              'venue': match.venue,
+              'date_iso': match.dateIso,
+              'toss_winner_id': match.tossWinnerId,
+              'toss_decision': match.tossDecision,
+              'match_title': match.matchTitle,
+              'ball_type': match.ballType,
+              'updated_at_epoch': nowEpoch,
+              'payload': {
+                ...match.toJson(),
+                'teamAName': store.teamName(match.teamAId),
+                'teamBName': store.teamName(match.teamBId),
+                'updatedAtEpoch': nowEpoch,
+              },
+            });
+          }
+          // Also schedule debounced full batch sync for overall database consistency
           CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
         } catch (_) {}
       }());
