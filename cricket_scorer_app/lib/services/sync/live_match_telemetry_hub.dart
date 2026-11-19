@@ -27,6 +27,7 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
   final Map<String, int> _lastRevisions = {};
   final Map<String, int> _lastEventsCounts = {};
   final Map<String, int> _lastEpochs = {};
+  final Map<String, Match> _liveMatches = {};
 
   final Map<String, Map<String, dynamic>> _offlineOutbox = {};
   bool _isFlushingOutbox = false;
@@ -40,6 +41,7 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
 
   bool get isOnline => _isOnline;
   int get pendingOutboxCount => _offlineOutbox.length;
+  Match? getLiveMatch(String id) => _liveMatches[id];
 
   /// Initialize the telemetry hub with the root store and restore any pending offline outbox
   Future<void> init(Store store) async {
@@ -56,6 +58,7 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
   /// Called on Scorer device after every ball, boundary, wicket, extra, or over end.
   /// Dispatches immediately to cPanel if online, or buffers in offline outbox if offline.
   Future<void> onMatchScored(Match match) async {
+    _liveMatches[match.id] = match;
     if (_store == null) return;
 
     final nowEpoch = DateTime.now().millisecondsSinceEpoch;
@@ -254,7 +257,7 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
 
   void _startBackgroundPolling() {
     _backgroundPollTimer?.cancel();
-    _backgroundPollTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+    _backgroundPollTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
       _pollWatchedMatches();
     });
   }
@@ -363,6 +366,8 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
             }
           }
         }
+
+        _liveMatches[updated.id] = updated;
 
         // Apply to Store
         if (_store!.isRemotePreview) {
