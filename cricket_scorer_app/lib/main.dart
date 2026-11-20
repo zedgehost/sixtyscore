@@ -1197,15 +1197,11 @@ class _HomeShellState extends State<HomeShell> {
               padding: const EdgeInsets.all(16),
 
               child: Text(
-                'Version 1.3.4',
-
+                'Version $kAppVersion',
                 textAlign: TextAlign.center,
-
                 style: TextStyle(
                   color: PitchTheme.outline,
-
                   fontSize: 11,
-
                   fontWeight: FontWeight.w600,
                 ),
               ),
