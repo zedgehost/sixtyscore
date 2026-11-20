@@ -331,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (widget.apiClient == null) {
         await client.init();
       }
-      if (client.token != null && client.token!.isNotEmpty) {
+      if (!silent && client.token != null && client.token!.isNotEmpty) {
         unawaited(() async {
           try {
             final syncService = CpanelSyncService(store: store, apiClient: client);
@@ -1795,7 +1795,10 @@ class _HomeScreenState extends State<HomeScreen>
 
   _UnifiedMatchCardItem _resolveMatchItem({Match? match, RemoteMatchSummary? remote}) {
     final mid = match?.id ?? remote!.id;
-    final freshM = LiveMatchTelemetryHub.instance.getLiveMatch(mid) ?? match ?? store.matchById(mid);
+    final isScoringThis = LiveMatchTelemetryHub.instance.isActivelyScoring(mid);
+    final freshM = isScoringThis
+        ? (store.matchById(mid) ?? LiveMatchTelemetryHub.instance.getLiveMatch(mid) ?? match)
+        : (LiveMatchTelemetryHub.instance.getLiveMatch(mid) ?? match ?? store.matchById(mid));
     final rm = remote;
 
     final id = freshM?.id ?? rm!.id;
@@ -1830,6 +1833,30 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
 
+    bool isMatchForTeamA(String bId) {
+      final clean = bId.trim();
+      if (clean.isEmpty) return false;
+      if (clean == teamAId) return true;
+      if (tAName.isNotEmpty && clean.toLowerCase() == tAName.toLowerCase()) return true;
+      final t = store.teamById(clean);
+      if (t != null && (t.id == teamAId || (tAName.isNotEmpty && t.name.toLowerCase() == tAName.toLowerCase()))) {
+        return true;
+      }
+      return false;
+    }
+
+    bool isMatchForTeamB(String bId) {
+      final clean = bId.trim();
+      if (clean.isEmpty) return false;
+      if (clean == teamBId) return true;
+      if (tBName.isNotEmpty && clean.toLowerCase() == tBName.toLowerCase()) return true;
+      final t = store.teamById(clean);
+      if (t != null && (t.id == teamBId || (tBName.isNotEmpty && t.name.toLowerCase() == tBName.toLowerCase()))) {
+        return true;
+      }
+      return false;
+    }
+
     int epoch = 0;
     if (freshM != null) {
       for (final inn in freshM.innings) {
@@ -1854,15 +1881,15 @@ class _HomeScreenState extends State<HomeScreen>
 
       for (final inn in freshM.innings) {
         final bId = inn.battingTeamId.trim();
-        if (bId.isNotEmpty) {
-          if (bId == teamAId && innA == null) innA = inn;
-          if (bId == teamBId && innB == null) innB = inn;
-        }
+        if (isMatchForTeamA(bId) && innA == null) innA = inn;
+        if (isMatchForTeamB(bId) && innB == null) innB = inn;
       }
 
       // Positional fallback ONLY if neither team was identified by battingTeamId:
       if (innA == null && innB == null) {
-        final teamABatsFirst = freshM.battingFirstId == teamAId;
+        final teamABatsFirst = freshM.battingFirstId.isNotEmpty
+            ? (freshM.battingFirstId == teamAId || isMatchForTeamA(freshM.battingFirstId))
+            : true;
         if (teamABatsFirst) {
           innA = freshM.innings[0];
           if (freshM.innings.length > 1) innB = freshM.innings[1];
@@ -1896,8 +1923,8 @@ class _HomeScreenState extends State<HomeScreen>
       if (isLive) {
         final curBattingId = activeInn.battingTeamId.trim();
         if (curBattingId.isNotEmpty) {
-          isTeamABatting = curBattingId == teamAId;
-          isTeamBBatting = curBattingId == teamBId;
+          isTeamABatting = isMatchForTeamA(curBattingId);
+          isTeamBBatting = isMatchForTeamB(curBattingId);
         } else if (activeInn == innA) {
           isTeamABatting = true;
           isTeamBBatting = false;
@@ -1916,10 +1943,8 @@ class _HomeScreenState extends State<HomeScreen>
 
       for (final inn in rm.innings) {
         final bId = inn.battingTeamId.trim();
-        if (bId.isNotEmpty) {
-          if (bId == teamAId && innA == null) innA = inn;
-          if (bId == teamBId && innB == null) innB = inn;
-        }
+        if (isMatchForTeamA(bId) && innA == null) innA = inn;
+        if (isMatchForTeamB(bId) && innB == null) innB = inn;
       }
 
       if (innA == null && innB == null) {
@@ -1955,8 +1980,8 @@ class _HomeScreenState extends State<HomeScreen>
       if (isLive) {
         final curBattingId = activeInn.battingTeamId.trim();
         if (curBattingId.isNotEmpty) {
-          isTeamABatting = curBattingId == teamAId;
-          isTeamBBatting = curBattingId == teamBId;
+          isTeamABatting = isMatchForTeamA(curBattingId);
+          isTeamBBatting = isMatchForTeamB(curBattingId);
         } else if (activeInn == innA) {
           isTeamABatting = true;
           isTeamBBatting = false;

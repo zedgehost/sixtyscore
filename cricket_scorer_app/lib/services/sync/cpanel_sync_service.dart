@@ -10,6 +10,7 @@ import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
+import 'package:cricket_scorer_app/services/sync/sync_service.dart';
 
 class CpanelSyncService {
   final Store store;
@@ -24,9 +25,15 @@ class CpanelSyncService {
   /// Fire-and-forget background sync with 3-second debounce.
   /// Never blocks the UI thread, never lags scoring, completely safe offline.
   void triggerAutoSync() {
+    if (SyncService().scoringActive) {
+      debugPrint('[CpanelSyncService] Scoring is active. Auto-sync deferred.');
+      return;
+    }
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(seconds: 3), () {
-      syncNow();
+    _debounceTimer = Timer(const Duration(seconds: 4), () {
+      if (!SyncService().scoringActive) {
+        syncNow();
+      }
     });
   }
 
@@ -74,6 +81,10 @@ class CpanelSyncService {
   /// Push ALL local store entities & metrics to cPanel MySQL.
   Future<bool> syncNow() async {
     if (_isSyncing) return false;
+    if (SyncService().scoringActive) {
+      debugPrint('[CpanelSyncService] Active ball scoring in progress. Cloud sync deferred.');
+      return false;
+    }
 
     if (apiClient.token == null || apiClient.token!.isEmpty) {
       debugPrint('[CpanelSyncService] No auth token present. Skipping cloud sync.');
@@ -213,6 +224,10 @@ class CpanelSyncService {
   /// Pull ALL user data from cPanel MySQL and merge safely into local Store.
   Future<Map<String, int>?> pullAndMerge() async {
     if (_isSyncing) return null;
+    if (SyncService().scoringActive) {
+      debugPrint('[CpanelSyncService] Active ball scoring in progress. Cloud pull deferred.');
+      return null;
+    }
 
     if (apiClient.token == null || apiClient.token!.isEmpty) {
       debugPrint('[CpanelSyncService] No auth token present. Skipping cloud pull.');

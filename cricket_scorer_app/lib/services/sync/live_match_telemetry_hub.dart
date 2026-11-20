@@ -22,6 +22,7 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
   final CpanelApiClient _apiClient = CpanelApiClient();
 
   String? _focusedMatchId;
+  String? _activeScoringMatchId;
   final Set<String> _watchedMatchIds = {};
 
   final Map<String, int> _lastRevisions = {};
@@ -43,6 +44,21 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
   int get pendingOutboxCount => _offlineOutbox.length;
   Match? getLiveMatch(String id) => _liveMatches[id];
   List<Match> get allLiveMatches => _liveMatches.values.toList();
+  String? get activeScoringMatchId => _activeScoringMatchId;
+
+  /// Authoritative Scorer Seam: Marks the match currently being scored locally.
+  /// Background polling and cloud merges MUST NEVER overwrite this match.
+  void setActiveScoringMatch(String matchId) {
+    _activeScoringMatchId = matchId;
+  }
+
+  void clearActiveScoringMatch([String? matchId]) {
+    if (matchId == null || _activeScoringMatchId == matchId) {
+      _activeScoringMatchId = null;
+    }
+  }
+
+  bool isActivelyScoring(String matchId) => _activeScoringMatchId == matchId;
 
   /// Initialize the telemetry hub with the root store and restore any pending offline outbox
   Future<void> init(Store store) async {
@@ -281,7 +297,7 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
 
   void _startBackgroundPolling() {
     _backgroundPollTimer?.cancel();
-    _backgroundPollTimer = Timer.periodic(const Duration(milliseconds: 1800), (_) {
+    _backgroundPollTimer = Timer.periodic(const Duration(milliseconds: 6000), (_) {
       _pollWatchedMatches();
     });
   }
@@ -291,6 +307,8 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
     _isPollingWatched = true;
     try {
       for (final mid in _watchedMatchIds.toList()) {
+        // Scorer is authoritative author: NEVER poll locally active scoring match
+        if (mid == _activeScoringMatchId) continue;
         await pollMatch(mid);
       }
     } finally {
@@ -301,6 +319,8 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
   /// Polls single match with deterministic delta checks (revision + events count + epoch)
   Future<bool> pollMatch(String matchId) async {
     if (_store == null) return false;
+    // Local scorer is the sole source of truth; never fetch from server while scoring
+    if (matchId == _activeScoringMatchId) return false;
     if (_focusedMatchId == matchId && _isPollingFocused) return false;
 
     if (_focusedMatchId == matchId) _isPollingFocused = true;
@@ -402,7 +422,14 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
             _store!.matches.add(updated);
           }
         } else {
-          await _store!.upsertMatch(updated);
+          // Zero Main-Thread Lag: update in-memory and write matches key only (never re-encode the whole DB)
+          final idx = _store!.matches.indexWhere((x) => x.id == updated.id);
+          if (idx >= 0) {
+            _store!.matches[idx] = updated;
+          } else {
+            _store!.matches.insert(0, updated);
+          }
+          await _store!.persistMatchesOnly(skipSync: true);
         }
 
         // Notify all UI screens (Scorecard, Tournament, Home) to re-render automatically
@@ -423,7 +450,7 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
 
   void _startNetworkHeartbeat() {
     _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
       final connected = await _apiClient.checkNetworkConnectivity();
       final wasOffline = !_isOnline;
       _isOnline = connected;

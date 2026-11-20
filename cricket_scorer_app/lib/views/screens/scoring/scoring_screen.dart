@@ -51,6 +51,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
     // during scoring is deferred, never dropped, and the local-only
     // close runs when scoring ends (see dispose).
     SyncService().scoringActive = true;
+    LiveMatchTelemetryHub.instance.setActiveScoringMatch(match.id);
     // Recents resume (v1.4.5): remember this screen so a cold start
     // after an OS kill can come back here (cleared on dispose).
     NavMemory.save('scoring', match.id);
@@ -111,10 +112,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
 
   @override
   void dispose() {
-    // Scoring guard: scoring closed — run the local-only close
-    // (final local save, no push, no pull — v1.4.5 fully local).
-    // (v1.4.4: live sync no longer exists; v1.4.5 removed the
-    // close-time sync and manual sync as well.)
+    LiveMatchTelemetryHub.instance.clearActiveScoringMatch(match.id);
     if (SyncService().scoringActive) {
       SyncService().scoringActive = false;
       unawaited(SyncService().syncAfterScoring(store));
@@ -179,7 +177,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
       // v1.4.5 action feedback: per-ball SUCCESS stays silent, but
       // a failed save must surface (persist returns false instead
       // of throwing now, so the catch below would never see it).
-      final saved = await store.persistMatchesOnly();
+      final saved = await store.persistMatchesOnly(skipSync: true);
       if (!saved) {
         DebugInfo.record('Ball save failed', StackTrace.current);
         if (mounted) {
@@ -220,6 +218,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
       unawaited(SyncService().syncAfterScoring(store));
     } else if (!wasLive && match.status == 'live') {
       SyncService().scoringActive = true;
+    LiveMatchTelemetryHub.instance.setActiveScoringMatch(match.id);
     }
     if (mounted) setState(() {});
   }
