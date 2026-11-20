@@ -19,6 +19,7 @@ import 'package:cricket_scorer_app/services/sync/live_match_telemetry_hub.dart';
 import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/services/sync/sync_service.dart';
 import 'package:cricket_scorer_app/domain/tournament/tournament_engine.dart';
+import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 
 /// One soft-deleted record kept in Trash (Feature 1 — Trash +
 /// Restore). [payload] is the entity's full `toJson()` map captured
@@ -1435,6 +1436,17 @@ class Store extends ChangeNotifier implements PlayoffStore {
       if (t.id == id) return t;
     }
     return null;
+  }
+
+  bool isTournamentOwner(String tournamentId) {
+    if (AuthService().isRestrictedGuest) return false;
+    final t = tournamentById(tournamentId);
+    if (t == null) return false;
+    final uid = effectiveUserId;
+    if (t.creatorId.isNotEmpty) {
+      return uid.isNotEmpty && t.creatorId == uid;
+    }
+    return true;
   }
 
   Match? matchById(String id) {

@@ -19,6 +19,7 @@ import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/services/sync/sync_service.dart';
 import 'package:cricket_scorer_app/core/theme/theme.dart';
 import 'package:cricket_scorer_app/domain/tournament/tournament_engine.dart';
+import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 
 class SuperOverScreen extends StatefulWidget {
   final Store store;
@@ -38,9 +39,31 @@ class _SuperOverScreenState extends State<SuperOverScreen> {
   /// the next innings and moves to it.
   int _current = 0;
 
+  bool get _canScore =>
+      !store.isRemotePreview &&
+      !AuthService().isRestrictedGuest &&
+      (match.canUserScore(store.effectiveUserId,
+              userCode: store.effectiveUserCode) ||
+          (match.tournamentId != null &&
+              store.isTournamentOwner(match.tournamentId!)));
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_canScore && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unauthorized: Only the match creator or tournament organizer can score the Super Over.',
+            ),
+            backgroundColor: PitchTheme.primary,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    });
+
     // Scoring guard (same as ScoringScreen): super-over balls
     // mutate the same match object, so no network may run while
     // this screen is open either (v1.4.4 light version).
@@ -72,6 +95,10 @@ class _SuperOverScreenState extends State<SuperOverScreen> {
   /// Mirror of ScoringScreen._afterChange: recompute the match
   /// result (so a decided super over rewrites resultText) and persist.
   Future<void> _afterChange() async {
+    if (!_canScore) {
+      _snack('Unauthorized: Only the match creator or tournament organizer can score.');
+      return;
+    }
     try {
       computeResult(match, store.teamName);
       // Smoothness (v1.4.3): per ball, only the matches key is

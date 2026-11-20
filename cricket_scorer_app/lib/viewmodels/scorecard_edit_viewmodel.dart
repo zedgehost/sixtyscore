@@ -3,6 +3,7 @@ import 'package:cricket_scorer_app/models/models.dart';
 import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/domain/tournament/tournament_engine.dart';
+import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 
 /// ViewModel for post-match scorecard corrections in MVVM architecture.
 /// Ensures DLS targets are preserved (GAP-15) and winner alterations
@@ -28,6 +29,16 @@ class ScorecardEditViewModel extends ChangeNotifier {
 
   /// Recomputes totals from figures and saves matches only.
   Future<bool> saveInningsEdits(List<InningsState> editedInnings) async {
+    final canScore = !store.isRemotePreview &&
+        !AuthService().isRestrictedGuest &&
+        (match.canUserScore(store.effectiveUserId,
+                userCode: store.effectiveUserCode) ||
+            (match.tournamentId != null &&
+                store.isTournamentOwner(match.tournamentId!)));
+    if (!canScore) {
+      return false;
+    }
+
     _isSaving = true;
     notifyListeners();
 

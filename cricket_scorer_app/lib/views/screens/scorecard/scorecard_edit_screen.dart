@@ -32,6 +32,7 @@ import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/core/theme/theme.dart';
 import 'package:cricket_scorer_app/domain/tournament/tournament_engine.dart';
+import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 
 class _BatEdit {
   final TextEditingController runs = TextEditingController();
@@ -152,6 +153,14 @@ class _ScorecardEditScreenState extends State<ScorecardEditScreen> {
   final List<_InnEdit> _inns = [];
   bool _saving = false;
 
+  bool get _canEdit =>
+      !store.isRemotePreview &&
+      !AuthService().isRestrictedGuest &&
+      (widget.match.canUserScore(store.effectiveUserId,
+              userCode: store.effectiveUserCode) ||
+          (widget.match.tournamentId != null &&
+              store.isTournamentOwner(widget.match.tournamentId!)));
+
   @override
   void initState() {
     super.initState();
@@ -161,6 +170,12 @@ class _ScorecardEditScreenState extends State<ScorecardEditScreen> {
       _inns.add(ie);
       _fillControllers(i, ie);
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_canEdit && mounted) {
+        _snack('Unauthorized: Only the match creator or tournament organizer can edit this scorecard.');
+        Navigator.pop(context);
+      }
+    });
   }
 
   @override
@@ -487,6 +502,10 @@ class _ScorecardEditScreenState extends State<ScorecardEditScreen> {
 
   Future<void> _save() async {
     if (_saving) return;
+    if (!_canEdit) {
+      _snack('Unauthorized: Only the match creator or tournament organizer can edit this scorecard.');
+      return;
+    }
     for (var i = 0; i < _edit.innings.length; i++) {
       final err = _applyInnings(i);
       if (err != null) {
