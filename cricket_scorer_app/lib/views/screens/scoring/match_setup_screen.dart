@@ -170,6 +170,16 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
     } else if (tournamentId != null && tournamentId!.trim().isNotEmpty) {
       stage = 'league';
       final t = store.tournamentById(tournamentId);
+      final uid = store.effectiveUserId;
+      final isOwner = !AuthService().isRestrictedGuest && (t != null && (t.creatorId.isNotEmpty ? (uid.isNotEmpty && t.creatorId == uid) : true));
+      if (!isOwner) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Only the tournament creator can create fixtures for this tournament.')));
+            Navigator.pop(context);
+          }
+        });
+      }
       if (t != null) {
         overs = t.oversLimit;
         _syncMatchTypeFromOvers(overs);
@@ -922,7 +932,14 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                   Navigator.pop(ctx);
                 },
               ),
-              ...store.tournaments.map((t) {
+              ...store.tournaments.where((t) {
+                if (AuthService().isRestrictedGuest) return false;
+                final uid = store.effectiveUserId;
+                if (t.creatorId.isNotEmpty) {
+                  return uid.isNotEmpty && t.creatorId == uid;
+                }
+                return true;
+              }).map((t) {
                 final isSelected = tournamentId == t.id;
                 return ListTile(
                   leading: Icon(

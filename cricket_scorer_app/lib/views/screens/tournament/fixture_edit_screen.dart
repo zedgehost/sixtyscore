@@ -134,6 +134,18 @@ class _FixtureEditScreenState extends State<FixtureEditScreen> {
       Navigator.pop(context);
       return;
     }
+    final uid = store.effectiveUserId;
+    bool canManage = m.canUserScore(uid, userCode: store.effectiveUserCode);
+    if (m.tournamentId != null && m.tournamentId!.isNotEmpty) {
+      final t = store.tournamentById(m.tournamentId!);
+      if (t != null && t.creatorId.isNotEmpty) {
+        canManage = uid.isNotEmpty && t.creatorId == uid;
+      }
+    }
+    if (!canManage) {
+      _snack('Only the tournament creator or match scorer can edit this fixture.');
+      return;
+    }
     if (_teamAId.isNotEmpty && _teamAId == _teamBId) {
       _snack('Both teams cannot be the same.');
       return;

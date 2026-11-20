@@ -1,4 +1,5 @@
-﻿import 'package:cricket_scorer_app/views/screens/scoring/match_toss_screen.dart';
+import 'package:cricket_scorer_app/services/auth/auth_service.dart';
+import 'package:cricket_scorer_app/views/screens/scoring/match_toss_screen.dart';
 import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
 import 'package:flutter/material.dart';
 
@@ -114,7 +115,27 @@ class _FixtureDetailScreenState extends State<FixtureDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  /// Strict authorization: Only the tournament owner or designated match creator/scorer
+  /// can edit, cancel, delete, or reopen this fixture.
+  bool get _canManageFixture {
+    final m = match;
+    if (m == null) return false;
+    if (AuthService().isRestrictedGuest) return false;
+    final uid = store.effectiveUserId;
+    if (m.tournamentId != null && m.tournamentId!.isNotEmpty) {
+      final t = store.tournamentById(m.tournamentId!);
+      if (t != null && t.creatorId.isNotEmpty) {
+        return uid.isNotEmpty && t.creatorId == uid;
+      }
+    }
+    return m.canUserScore(uid, userCode: store.effectiveUserCode);
+  }
+
   Future<void> _cancelFixture(Match m) async {
+    if (!_canManageFixture) {
+      _snack('Only the tournament creator or match scorer can cancel this fixture.');
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
@@ -144,6 +165,10 @@ class _FixtureDetailScreenState extends State<FixtureDetailScreen> {
   }
 
   Future<void> _reopenFixture(Match m) async {
+    if (!_canManageFixture) {
+      _snack('Only the tournament creator or match scorer can reopen this fixture.');
+      return;
+    }
     m.status = 'upcoming';
     await store.upsertMatch(m);
     CpanelSyncService.triggerAutoSyncFor(store);
@@ -155,6 +180,10 @@ class _FixtureDetailScreenState extends State<FixtureDetailScreen> {
   /// title, round — see FixtureEditScreen for the guard rails
   /// (upcoming fixtures only, so no scoring data can be harmed).
   Future<void> _editFixture(Match m) async {
+    if (!_canManageFixture) {
+      _snack('Only the tournament creator or match scorer can edit this fixture.');
+      return;
+    }
     final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -170,6 +199,10 @@ class _FixtureDetailScreenState extends State<FixtureDetailScreen> {
   /// removed. Live matches are never routed here, and completed
   /// matches keep their own delete actions (scorecard / lists).
   Future<void> _deleteFixture(Match m) async {
+    if (!_canManageFixture) {
+      _snack('Only the tournament creator or match scorer can delete this fixture.');
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
@@ -1146,6 +1179,17 @@ class _FixtureDetailScreenState extends State<FixtureDetailScreen> {
   // ---------- Status-based actions (existing logic, preserved) ----------
 
   List<Widget> _statusActions(Match m) {
+    if (!_canManageFixture) {
+      return [
+        ScoreButton(
+          label: 'Share Poster',
+          kind: ScoreButtonKind.ghost,
+          icon: Icons.share_outlined,
+          onPressed: () => shareFixturePoster(context, store, m),
+        ),
+      ];
+    }
+
     switch (m.status) {
       case 'upcoming':
         return [

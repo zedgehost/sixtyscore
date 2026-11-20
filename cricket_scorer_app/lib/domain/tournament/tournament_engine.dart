@@ -47,7 +47,7 @@ class PlayoffUpdate {
 
 /// League-stage fixtures of a tournament (excludes semifinals / final).
 List<Match> leagueMatchesOf(String tournamentId, List<Match> all) => all
-    .where((m) => m.tournamentId == tournamentId && m.stage == 'league')
+    .where((m) => m.tournamentId == tournamentId && (m.stage == 'league' || m.stage.isEmpty))
     .toList();
 
 /// Playoff fixtures of a tournament, ordered SF1, SF2, Final.
@@ -156,7 +156,7 @@ List<PointsRow> leaguePointsTable(
   return computePointsTable(
     t.id,
     tids,
-    allMatches.where((m) => m.stage == 'league').toList(),
+    allMatches.where((m) => m.stage == 'league' || m.stage.isEmpty).toList(),
     pointsAdjustments: t.pointsAdjustments,
     pointsTableOverrides: t.pointsTableOverrides,
   );
