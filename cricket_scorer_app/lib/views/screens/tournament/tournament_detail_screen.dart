@@ -3142,60 +3142,62 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.tune_outlined, size: 18, color: PitchTheme.secondary),
-                  SizedBox(width: 8),
-                  Text(
-                    'Tournament Management',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14.5,
-                      color: PitchTheme.onSurface,
+          child: Material(
+            color: Colors.transparent,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.tune_outlined, size: 18, color: PitchTheme.secondary),
+                    SizedBox(width: 8),
+                    Text(
+                      'Tournament Management',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14.5,
+                        color: PitchTheme.onSurface,
+                      ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (isTournamentOwner) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.edit_outlined, color: PitchTheme.primary),
+                    title: const Text('Edit Tournament Details', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                    subtitle: const Text('Update name, venue, ball type, overs limit', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
+                    trailing: const Icon(Icons.chevron_right, size: 18),
+                    onTap: _editTournamentDetails,
                   ),
+                  const Divider(height: 1),
                 ],
-              ),
-              const SizedBox(height: 12),
-              if (isTournamentOwner) ...[
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.edit_outlined, color: PitchTheme.primary),
-                  title: const Text('Edit Tournament Details', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                  subtitle: const Text('Update name, venue, ball type, overs limit', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
+                  leading: const Icon(Icons.groups_outlined, color: PitchTheme.primary),
+                  title: const Text('Player Auction / Draft', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                  subtitle: const Text('Live bidding & team draft management', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
                   trailing: const Icon(Icons.chevron_right, size: 18),
-                  onTap: _editTournamentDetails,
-                ),
-                const Divider(height: 1),
-              ],
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.groups_outlined, color: PitchTheme.primary),
-                title: const Text('Player Auction / Draft', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                subtitle: const Text('Live bidding & team draft management', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
-                trailing: const Icon(Icons.chevron_right, size: 18),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DraftListScreen(
-                      store: store,
-                      initialTournamentId: tournament.id,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => DraftListScreen(
+                        store: store,
+                        initialTournamentId: tournament.id,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const Divider(height: 1),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.share_outlined, color: PitchTheme.primary),
-                title: const Text('Share Points Table', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                subtitle: const Text('Export branded PNG standings card', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
-                trailing: const Icon(Icons.chevron_right, size: 18),
-                onTap: () => sharePointsTableImage(context, store, tournament),
-              ),
+                const Divider(height: 1),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.share_outlined, color: PitchTheme.primary),
+                  title: const Text('Share Points Table', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                  subtitle: const Text('Export branded PNG standings card', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
+                  trailing: const Icon(Icons.chevron_right, size: 18),
+                  onTap: () => sharePointsTableImage(context, store, tournament),
+                ),
               const Divider(height: 1),
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -3233,6 +3235,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             ],
           ),
         ),
+      ),
       ],
     );
   }
