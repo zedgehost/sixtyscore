@@ -847,6 +847,7 @@ class TournamentCard extends StatelessWidget {
   final int teamCount;
   final int matchCount;
   final bool loggedIn;
+  final bool isOwner;
   final VoidCallback onTap;
   final VoidCallback onTogglePublish;
   final VoidCallback onEdit;
@@ -858,6 +859,7 @@ class TournamentCard extends StatelessWidget {
     required this.teamCount,
     required this.matchCount,
     required this.loggedIn,
+    this.isOwner = true,
     required this.onTap,
     required this.onTogglePublish,
     required this.onEdit,
@@ -1103,35 +1105,37 @@ class TournamentCard extends StatelessWidget {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (loggedIn)
+                        if (isOwner) ...[
+                          if (loggedIn)
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.all(4),
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              icon: Icon(
+                                t.published ? Icons.public : Icons.public_off,
+                                size: 19,
+                                color: t.published ? PitchTheme.secondary : PitchTheme.outline,
+                              ),
+                              tooltip: t.published ? 'Unpublish' : 'Publish',
+                              onPressed: onTogglePublish,
+                            ),
                           IconButton(
                             visualDensity: VisualDensity.compact,
                             padding: const EdgeInsets.all(4),
                             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                            icon: Icon(
-                              t.published ? Icons.public : Icons.public_off,
-                              size: 19,
-                              color: t.published ? PitchTheme.secondary : PitchTheme.outline,
-                            ),
-                            tooltip: t.published ? 'Unpublish' : 'Publish',
-                            onPressed: onTogglePublish,
+                            icon: const Icon(Icons.edit, size: 19, color: PitchTheme.onSurfaceVariant),
+                            tooltip: 'Edit Tournament',
+                            onPressed: onEdit,
                           ),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(4),
-                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                          icon: const Icon(Icons.edit, size: 19, color: PitchTheme.onSurfaceVariant),
-                          tooltip: 'Edit Tournament',
-                          onPressed: onEdit,
-                        ),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(4),
-                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                          icon: const Icon(Icons.delete_outline, size: 19, color: PitchTheme.error),
-                          tooltip: 'Delete Tournament',
-                          onPressed: onDelete,
-                        ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            icon: const Icon(Icons.delete_outline, size: 19, color: PitchTheme.error),
+                            tooltip: 'Delete Tournament',
+                            onPressed: onDelete,
+                          ),
+                        ],
                       ],
                     ),
                   ],
@@ -1179,6 +1183,17 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
   }
 
   Future<void> _editTournament(Tournament? existing) async {
+    if (existing != null) {
+      final uid = store.effectiveUserId;
+      final isOwner = !AuthService().isRestrictedGuest &&
+          (existing.creatorId.isNotEmpty ? (uid.isNotEmpty && existing.creatorId == uid) : true);
+      if (!isOwner) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Only the tournament creator can edit this tournament.')),
+        );
+        return;
+      }
+    }
     if (!await requireSignedInAction(
       context,
       store,
@@ -1192,6 +1207,15 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
   }
 
   Future<void> _togglePublish(Tournament t) async {
+    final uid = store.effectiveUserId;
+    final isOwner = !AuthService().isRestrictedGuest &&
+        (t.creatorId.isNotEmpty ? (uid.isNotEmpty && t.creatorId == uid) : true);
+    if (!isOwner) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the tournament creator can publish or unpublish.')),
+      );
+      return;
+    }
     if (!await requireSignedInAction(
       context,
       store,
@@ -1218,6 +1242,15 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
   }
 
   Future<void> _deleteTournament(Tournament t) async {
+    final uid = store.effectiveUserId;
+    final isOwner = !AuthService().isRestrictedGuest &&
+        (t.creatorId.isNotEmpty ? (uid.isNotEmpty && t.creatorId == uid) : true);
+    if (!isOwner) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the tournament creator can delete this tournament.')),
+      );
+      return;
+    }
     if (!await requireSignedInAction(
       context,
       store,
@@ -1461,11 +1494,14 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                         final t = list[i];
                         final teamCount = t.teamIds.length;
                         final matchCount = store.matches.where((m) => m.tournamentId == t.id).length;
+                        final isOwner = !AuthService().isRestrictedGuest &&
+                            (t.creatorId.isNotEmpty ? (uid.isNotEmpty && t.creatorId == uid) : true);
                         return TournamentCard(
                           tournament: t,
                           teamCount: teamCount,
                           matchCount: matchCount,
                           loggedIn: loggedIn,
+                          isOwner: isOwner,
                           onTogglePublish: () => _togglePublish(t),
                           onEdit: () => _editTournament(t),
                           onDelete: () => _deleteTournament(t),

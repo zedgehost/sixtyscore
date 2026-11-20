@@ -604,6 +604,11 @@ class Store extends ChangeNotifier implements PlayoffStore {
             m.creatorName = profile!.displayName;
           }
         }
+        for (final t in tournaments) {
+          if (t.creatorId == _localUid || t.creatorId.isEmpty) {
+            t.creatorId = _identityId;
+          }
+        }
       }
       await persist();
       return;

@@ -136,7 +136,24 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       ((_playoffUpdate?.finalQualifiers ?? tournament.qualifiedTeamIds)
           .isNotEmpty);
 
+  /// Strict ownership check: Only the tournament creator/owner can edit details,
+  /// delete tournament, manage teams, edit points table, or generate fixtures.
+  bool get isTournamentOwner {
+    if (AuthService().isRestrictedGuest) return false;
+    final uid = store.effectiveUserId;
+    if (tournament.creatorId.isNotEmpty) {
+      return uid.isNotEmpty && tournament.creatorId == uid;
+    }
+    return true;
+  }
+
   Future<void> _editTournamentDetails() async {
+    if (!isTournamentOwner) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the tournament creator can edit tournament details.')),
+      );
+      return;
+    }
     final updated = await showTournamentEditDialog(context, store, tournament);
     if (updated != null) {
       final idx = store.tournaments.indexWhere((t) => t.id == updated.id);
@@ -155,6 +172,12 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   Future<void> _confirmDeleteTournament() async {
+    if (!isTournamentOwner) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the tournament creator can delete this tournament.')),
+      );
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
@@ -220,7 +243,6 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     }
 
     late final Widget screen;
-    final isTournamentOwner = tournament.creatorId.isEmpty || tournament.creatorId == store.effectiveUserId;
     final canScore = !AuthService().isRestrictedGuest &&
         (isTournamentOwner || fresh.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode));
 
@@ -242,6 +264,14 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   Future<void> _showEditFixtureDialog(Match m) async {
+    final canEdit = isTournamentOwner ||
+        m.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode);
+    if (!canEdit) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the tournament creator or match scorer can edit this fixture.')),
+      );
+      return;
+    }
     DateTime selectedDate;
     TimeOfDay selectedTime;
     try {
@@ -593,7 +623,6 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       store.persistMatchesOnly();
     }
     final effectiveStatus = isMatchCompleted ? 'completed' : m.status;
-    final isTournamentOwner = tournament.creatorId.isEmpty || tournament.creatorId == store.effectiveUserId;
     final canScoreThisMatch = !AuthService().isRestrictedGuest &&
         (isTournamentOwner || m.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode));
 
@@ -1524,16 +1553,18 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
               tooltip: 'Share points table',
               onPressed: () => sharePointsTableImage(context, store, tournament),
             ),
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, color: PitchTheme.onSurface),
-              tooltip: 'Edit tournament details',
-              onPressed: _editTournamentDetails,
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, color: PitchTheme.error),
-              tooltip: 'Delete tournament',
-              onPressed: _confirmDeleteTournament,
-            ),
+            if (isTournamentOwner) ...[
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, color: PitchTheme.onSurface),
+                tooltip: 'Edit tournament details',
+                onPressed: _editTournamentDetails,
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: PitchTheme.error),
+                tooltip: 'Delete tournament',
+                onPressed: _confirmDeleteTournament,
+              ),
+            ],
           ],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(48),
@@ -1558,31 +1589,33 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             ),
           ),
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: PitchTheme.primary,
-          foregroundColor: Colors.white,
-          onPressed: () async {
-            if (!await requireSignedInAction(context, store,
-                actionLabel: 'create tournament fixtures')) {
-              return;
-            }
-            if (!context.mounted) return;
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => MatchSetupScreen(
-                  store: store,
-                  tournamentId: tournament.id,
+        floatingActionButton: isTournamentOwner
+            ? FloatingActionButton.extended(
+                backgroundColor: PitchTheme.primary,
+                foregroundColor: Colors.white,
+                onPressed: () async {
+                  if (!await requireSignedInAction(context, store,
+                      actionLabel: 'create tournament fixtures')) {
+                    return;
+                  }
+                  if (!context.mounted) return;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MatchSetupScreen(
+                        store: store,
+                        tournamentId: tournament.id,
+                      ),
+                    ),
+                  ).then((_) => setState(() {}));
+                },
+                icon: const Icon(Icons.add),
+                label: const Text(
+                  'New Fixture',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
-              ),
-            ).then((_) => setState(() {}));
-          },
-          icon: const Icon(Icons.add),
-          label: const Text(
-            'New Fixture',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
+              )
+            : null,
         body: TabBarView(
           children: [
             // Tab 1: Fixtures (hero banner is exclusively in this tab)
@@ -1825,14 +1858,15 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                       ),
                     ],
                   ),
-                  TextButton.icon(
-                    icon: const Icon(Icons.auto_mode, size: 16, color: PitchTheme.secondary),
-                    label: const Text(
-                      'Auto Fixtures',
-                      style: TextStyle(color: PitchTheme.secondary, fontWeight: FontWeight.w700),
+                  if (isTournamentOwner)
+                    TextButton.icon(
+                      icon: const Icon(Icons.auto_mode, size: 16, color: PitchTheme.secondary),
+                      label: const Text(
+                        'Auto Fixtures',
+                        style: TextStyle(color: PitchTheme.secondary, fontWeight: FontWeight.w700),
+                      ),
+                      onPressed: () => _generateScheduleDialog(),
                     ),
-                    onPressed: () => _generateScheduleDialog(),
-                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -1859,21 +1893,25 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Generate a full round-robin schedule or add fixtures manually.',
+                      Text(
+                        isTournamentOwner
+                            ? 'Generate a full round-robin schedule or add fixtures manually.'
+                            : 'No fixtures have been scheduled for this tournament yet.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: PitchTheme.outline),
+                        style: const TextStyle(fontSize: 12, color: PitchTheme.outline),
                       ),
-                      const SizedBox(height: 12),
-                      FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: PitchTheme.primary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      if (isTournamentOwner) ...[
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: PitchTheme.primary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          icon: const Icon(Icons.auto_mode, size: 16),
+                          label: const Text('Generate Round-Robin Schedule'),
+                          onPressed: () => _generateScheduleDialog(),
                         ),
-                        icon: const Icon(Icons.auto_mode, size: 16),
-                        label: const Text('Generate Round-Robin Schedule'),
-                        onPressed: () => _generateScheduleDialog(),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -1914,14 +1952,15 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                       ),
                     ],
                   ),
-                  TextButton.icon(
-                    icon: const Icon(Icons.emoji_events_outlined, size: 16, color: PitchTheme.secondary),
-                    label: const Text(
-                      'Auto Knockouts',
-                      style: TextStyle(color: PitchTheme.secondary, fontWeight: FontWeight.w700),
+                  if (isTournamentOwner)
+                    TextButton.icon(
+                      icon: const Icon(Icons.emoji_events_outlined, size: 16, color: PitchTheme.secondary),
+                      label: const Text(
+                        'Auto Knockouts',
+                        style: TextStyle(color: PitchTheme.secondary, fontWeight: FontWeight.w700),
+                      ),
+                      onPressed: () => _generatePlayoffsDialog(),
                     ),
-                    onPressed: () => _generatePlayoffsDialog(),
-                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -1947,21 +1986,25 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Setup Semifinals, Grand Final, or IPL-style Page playoffs.',
+                      Text(
+                        isTournamentOwner
+                            ? 'Setup Semifinals, Grand Final, or IPL-style Page playoffs.'
+                            : 'Playoff stage has not started yet.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: PitchTheme.outline),
+                        style: const TextStyle(fontSize: 12, color: PitchTheme.outline),
                       ),
-                      const SizedBox(height: 12),
-                      FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: PitchTheme.primary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      if (isTournamentOwner) ...[
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: PitchTheme.primary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          icon: const Icon(Icons.emoji_events_outlined, size: 16),
+                          label: const Text('Setup Knockouts / Playoffs'),
+                          onPressed: () => _generatePlayoffsDialog(),
                         ),
-                        icon: const Icon(Icons.emoji_events_outlined, size: 16),
-                        label: const Text('Setup Knockouts / Playoffs'),
-                        onPressed: () => _generatePlayoffsDialog(),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -2087,12 +2130,12 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                                 ],
                               ],
                             ),
-                            onTap: () => _editPointsRow(rows[i]),
+                            onTap: isTournamentOwner ? () => _editPointsRow(rows[i]) : null,
                           ),
-                          DataCell(Text('${rows[i].played}'), onTap: () => _editPointsRow(rows[i])),
-                          DataCell(Text('${rows[i].won}'), onTap: () => _editPointsRow(rows[i])),
-                          DataCell(Text('${rows[i].lost}'), onTap: () => _editPointsRow(rows[i])),
-                          DataCell(Text('${rows[i].tied}'), onTap: () => _editPointsRow(rows[i])),
+                          DataCell(Text('${rows[i].played}'), onTap: isTournamentOwner ? () => _editPointsRow(rows[i]) : null),
+                          DataCell(Text('${rows[i].won}'), onTap: isTournamentOwner ? () => _editPointsRow(rows[i]) : null),
+                          DataCell(Text('${rows[i].lost}'), onTap: isTournamentOwner ? () => _editPointsRow(rows[i]) : null),
+                          DataCell(Text('${rows[i].tied}'), onTap: isTournamentOwner ? () => _editPointsRow(rows[i]) : null),
                           DataCell(
                             Text(
                               '${rows[i].points}',
@@ -2102,7 +2145,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                                 fontSize: 14,
                               ),
                             ),
-                            onTap: () => _editPointsRow(rows[i]),
+                            onTap: isTournamentOwner ? () => _editPointsRow(rows[i]) : null,
                           ),
                           DataCell(
                             Text(
@@ -2116,7 +2159,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                                     : PitchTheme.error,
                               ),
                             ),
-                            onTap: () => _editPointsRow(rows[i]),
+                            onTap: isTournamentOwner ? () => _editPointsRow(rows[i]) : null,
                           ),
                         ],
                       ),
@@ -2130,6 +2173,12 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   Future<void> _editPointsRow(PointsRow row) async {
+    if (!isTournamentOwner) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the tournament creator can edit the points table.')),
+      );
+      return;
+    }
     final teamId = row.teamId;
     final existing = tournament.pointsTableOverrides[teamId];
 
@@ -2413,43 +2462,45 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: PitchTheme.primary,
-                      side: const BorderSide(color: PitchTheme.outlineVariant),
-                      padding: const EdgeInsets.symmetric(vertical: 9),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            if (isTournamentOwner) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: PitchTheme.primary,
+                        side: const BorderSide(color: PitchTheme.outlineVariant),
+                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.playlist_add, size: 17),
+                      label: const Text(
+                        'Enroll Teams',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                      ),
+                      onPressed: _showEnrollTeamsDialog,
                     ),
-                    icon: const Icon(Icons.playlist_add, size: 17),
-                    label: const Text(
-                      'Enroll Teams',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
-                    ),
-                    onPressed: _showEnrollTeamsDialog,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: PitchTheme.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 9),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: PitchTheme.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.add, size: 17),
+                      label: const Text(
+                        'New Team',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                      ),
+                      onPressed: _showCreateTeamForTournamentDialog,
                     ),
-                    icon: const Icon(Icons.add, size: 17),
-                    label: const Text(
-                      'New Team',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
-                    ),
-                    onPressed: _showCreateTeamForTournamentDialog,
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 12),
@@ -2649,13 +2700,14 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                                     if (mounted) setState(() {});
                                   }),
                                 ),
-                                IconButton(
-                                  visualDensity: VisualDensity.compact,
-                                  padding: const EdgeInsets.all(4),
-                                  icon: const Icon(Icons.delete_outline, size: 18, color: PitchTheme.error),
-                                  tooltip: 'Remove from tournament',
-                                  onPressed: () => _removeTeamFromTournament(team),
-                                ),
+                                if (isTournamentOwner)
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.all(4),
+                                    icon: const Icon(Icons.delete_outline, size: 18, color: PitchTheme.error),
+                                    tooltip: 'Remove from tournament',
+                                    onPressed: () => _removeTeamFromTournament(team),
+                                  ),
                               ],
                             ),
                           ],
@@ -2672,6 +2724,12 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   Future<void> _showEnrollTeamsDialog() async {
+    if (!isTournamentOwner) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the tournament creator can enroll teams.')),
+      );
+      return;
+    }
     final currentSelected = Set<String>.from(tournament.teamIds);
     String query = '';
 
@@ -2835,6 +2893,12 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   Future<void> _showCreateTeamForTournamentDialog() async {
+    if (!isTournamentOwner) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the tournament creator can add new teams.')),
+      );
+      return;
+    }
     final nameCtrl = TextEditingController();
 
     final created = await showDialog<bool>(
@@ -2901,6 +2965,12 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   Future<void> _removeTeamFromTournament(Team team) async {
+    if (!isTournamentOwner) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the tournament creator can remove teams.')),
+      );
+      return;
+    }
     final matchesInTournament = store.matches
         .where((m) => m.tournamentId == tournament.id && (m.teamAId == team.id || m.teamBId == team.id))
         .length;
@@ -3090,15 +3160,17 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.edit_outlined, color: PitchTheme.primary),
-                title: const Text('Edit Tournament Details', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                subtitle: const Text('Update name, venue, ball type, overs limit', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
-                trailing: const Icon(Icons.chevron_right, size: 18),
-                onTap: _editTournamentDetails,
-              ),
-              const Divider(height: 1),
+              if (isTournamentOwner) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.edit_outlined, color: PitchTheme.primary),
+                  title: const Text('Edit Tournament Details', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                  subtitle: const Text('Update name, venue, ball type, overs limit', style: TextStyle(fontSize: 11, color: PitchTheme.outline)),
+                  trailing: const Icon(Icons.chevron_right, size: 18),
+                  onTap: _editTournamentDetails,
+                ),
+                const Divider(height: 1),
+              ],
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.groups_outlined, color: PitchTheme.primary),
