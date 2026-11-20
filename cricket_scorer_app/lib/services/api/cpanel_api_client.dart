@@ -321,6 +321,28 @@ class CpanelApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> _delete(String path) async {
+    try {
+      final uri = Uri.parse('$_baseUrl$path');
+      final res = await _client
+          .delete(uri, headers: _headers())
+          .timeout(const Duration(seconds: 20));
+      return _processResponse(res);
+    } catch (e) {
+      return {'status': 'error', 'message': e.toString()};
+    }
+  }
+
+  /// Delete a tournament and trigger server-side cascade deletion of all its matches
+  Future<Map<String, dynamic>> deleteTournament(String id) async {
+    return _delete('/tournaments/$id');
+  }
+
+  /// Delete a single match on backend
+  Future<Map<String, dynamic>> deleteMatch(String id) async {
+    return _delete('/matches/$id');
+  }
+
   Map<String, dynamic> _processResponse(http.Response res) {
     try {
       final Map<String, dynamic> json = jsonDecode(res.body);

@@ -15,6 +15,7 @@ import 'package:cricket_scorer_app/domain/draft/draft.dart';
 import 'package:cricket_scorer_app/services/sync/entity_sync.dart';
 import 'package:cricket_scorer_app/models/models.dart';
 import 'package:cricket_scorer_app/services/sync/publish_service.dart';
+import 'package:cricket_scorer_app/services/sync/live_match_telemetry_hub.dart';
 import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/services/sync/sync_service.dart';
 import 'package:cricket_scorer_app/domain/tournament/tournament_engine.dart';
@@ -442,6 +443,7 @@ class Store extends ChangeNotifier implements PlayoffStore {
     // saved delta can never be re-migrated as an absolute.
     migrateOverridesToDeltas();
     welcomeDone = prefs.getBool(_kWelcome) ?? true;
+    await purgeOrphanTournamentMatches();
     loaded = true;
     notifyListeners();
   }
@@ -1648,15 +1650,67 @@ class Store extends ChangeNotifier implements PlayoffStore {
   }
 
   Future<void> deleteTournament(String id) async {
-    // Snapshot into Trash BEFORE removal (Feature 1).
+    // Snapshot tournament into Trash BEFORE removal (Feature 1).
     final t = tournamentById(id);
     if (t != null) {
       _snapshotToTrash(EntityKind.tournaments, id,
           t.name.isNotEmpty ? t.name : id, t.toJson());
     }
+
+    // 1. Cascade delete all matches linked to this tournament
+    final relatedMatches = matches.where((m) => m.tournamentId == id).toList();
+    final relatedMatchIds = relatedMatches.map((m) => m.id).toList();
+
+    for (final m in relatedMatches) {
+      _snapshotToTrash(
+          EntityKind.matches, m.id, _matchTrashName(m), m.toJson());
+      _recordTombstone(EntityKind.matches, m.id);
+    }
+    matches.removeWhere((m) => m.tournamentId == id);
+
+    // Unwatch & clear live matches from LiveMatchTelemetryHub
+    if (relatedMatchIds.isNotEmpty) {
+      LiveMatchTelemetryHub.instance.unwatchMatches(relatedMatchIds);
+      for (final mid in relatedMatchIds) {
+        LiveMatchTelemetryHub.instance.removeLiveMatch(mid);
+      }
+    }
+
     tournaments.removeWhere((t) => t.id == id);
     _recordTombstone(EntityKind.tournaments, id);
     await persist();
+  }
+
+  /// Cleans up any leftover matches whose parent tournament has been deleted
+  Future<int> purgeOrphanTournamentMatches() async {
+    final validTournIds = tournaments.map((t) => t.id).toSet();
+    final orphanMatches = matches.where((m) {
+      return m.tournamentId != null &&
+          m.tournamentId!.isNotEmpty &&
+          !validTournIds.contains(m.tournamentId);
+    }).toList();
+
+    if (orphanMatches.isEmpty) return 0;
+
+    final orphanIds = orphanMatches.map((m) => m.id).toList();
+    for (final m in orphanMatches) {
+      _snapshotToTrash(
+          EntityKind.matches, m.id, _matchTrashName(m), m.toJson());
+      _recordTombstone(EntityKind.matches, m.id);
+    }
+    matches.removeWhere((m) {
+      return m.tournamentId != null &&
+          m.tournamentId!.isNotEmpty &&
+          !validTournIds.contains(m.tournamentId);
+    });
+
+    LiveMatchTelemetryHub.instance.unwatchMatches(orphanIds);
+    for (final mid in orphanIds) {
+      LiveMatchTelemetryHub.instance.removeLiveMatch(mid);
+    }
+
+    await persist();
+    return orphanMatches.length;
   }
 
   Future<void> upsertMatch(Match m) async {

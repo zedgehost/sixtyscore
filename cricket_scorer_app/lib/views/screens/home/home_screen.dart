@@ -159,6 +159,7 @@ class _HomeScreenState extends State<HomeScreen>
     });
 
     _loadCachedFeed();
+    store.purgeOrphanTournamentMatches();
     _fetchLiveFeed(silent: true);
     // Real-time live feed polling: 3.5 seconds when active
     _feedTimer = Timer.periodic(const Duration(milliseconds: 3500), (_) {

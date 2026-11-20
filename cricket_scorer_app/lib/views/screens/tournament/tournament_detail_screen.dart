@@ -17,6 +17,7 @@ import 'package:cricket_scorer_app/models/models.dart';
 import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/share/points_table_share.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
+import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
 import 'package:cricket_scorer_app/services/sync/publish_service.dart';
 import 'package:cricket_scorer_app/services/sync/live_match_telemetry_hub.dart';
@@ -190,6 +191,13 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
         PublishService().deletePublishedDoc(tournament.id);
       }
       await store.deleteTournament(tournament.id);
+      unawaited(() async {
+        try {
+          final client = CpanelApiClient();
+          await client.init();
+          await client.deleteTournament(tournament.id);
+        } catch (_) {}
+      }());
       _triggerCloudSync();
       if (mounted) Navigator.pop(context);
     }

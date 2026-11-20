@@ -254,6 +254,22 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
     }
   }
 
+  /// Removes a match permanently from memory and clears polling state
+  void removeLiveMatch(String matchId) {
+    _liveMatches.remove(matchId);
+    _watchedMatchIds.remove(matchId);
+    _lastRevisions.remove(matchId);
+    _lastEventsCounts.remove(matchId);
+    _lastEpochs.remove(matchId);
+    _offlineOutbox.remove(matchId);
+    if (_focusedMatchId == matchId) {
+      _focusedMatchId = null;
+      _focusedPollTimer?.cancel();
+      _focusedPollTimer = null;
+    }
+    notifyListeners();
+  }
+
   void _startFocusedPolling() {
     _focusedPollTimer?.cancel();
     _focusedPollTimer = Timer.periodic(const Duration(milliseconds: 2200), (_) {

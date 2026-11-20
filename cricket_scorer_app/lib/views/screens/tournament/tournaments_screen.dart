@@ -1164,6 +1164,7 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
     super.initState();
     store.addListener(_onChanged);
     AuthService().addListener(_onChanged);
+    store.purgeOrphanTournamentMatches();
   }
 
   @override
@@ -1232,7 +1233,7 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete Tournament?'),
         content: Text(
-          'Delete "${t.name}"? Existing matches will remain in history but will no longer be linked to this tournament.',
+          'Delete "${t.name}"? This will permanently delete this tournament and ALL of its scheduled, live, and completed matches across all screens, devices, and server.',
         ),
         actions: [
           TextButton(
@@ -1242,7 +1243,7 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: PitchTheme.error),
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            child: const Text('Delete All', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -1254,6 +1255,7 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
         try {
           final client = CpanelApiClient();
           await client.init();
+          await client.deleteTournament(t.id);
           CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
         } catch (_) {}
       }());
