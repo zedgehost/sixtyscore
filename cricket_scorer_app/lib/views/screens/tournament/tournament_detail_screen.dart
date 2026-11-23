@@ -294,6 +294,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
 
     final venueCtrl = TextEditingController(text: m.venue.isNotEmpty ? m.venue : tournament.venue);
     final titleCtrl = TextEditingController(text: m.matchTitle);
+    var teamAId = m.teamAId;
+    var teamBId = m.teamBId;
 
     final saved = await showDialog<bool>(
       context: context,
@@ -337,6 +339,54 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
+
+                  if (m.status == 'upcoming') ...[
+                    // Team A Selector
+                    DropdownButtonFormField<String>(
+                      value: tournament.teamIds.contains(teamAId) ? teamAId : '',
+                      decoration: const InputDecoration(
+                        labelText: 'Team A',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: '',
+                          child: Text('— TBD / Empty —'),
+                        ),
+                        for (final tid in tournament.teamIds)
+                          DropdownMenuItem<String>(
+                            value: tid,
+                            child: Text(store.teamName(tid), overflow: TextOverflow.ellipsis),
+                          ),
+                      ],
+                      onChanged: (val) => setD(() => teamAId = val ?? ''),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Team B Selector
+                    DropdownButtonFormField<String>(
+                      value: tournament.teamIds.contains(teamBId) ? teamBId : '',
+                      decoration: const InputDecoration(
+                        labelText: 'Team B',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: '',
+                          child: Text('— TBD / Empty —'),
+                        ),
+                        for (final tid in tournament.teamIds)
+                          DropdownMenuItem<String>(
+                            value: tid,
+                            child: Text(store.teamName(tid), overflow: TextOverflow.ellipsis),
+                          ),
+                      ],
+                      onChanged: (val) => setD(() => teamBId = val ?? ''),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
 
                   // Match Title (optional)
                   TextField(
@@ -433,6 +483,15 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     );
 
     if (saved == true) {
+      if (teamAId.isNotEmpty && teamBId.isNotEmpty && teamAId == teamBId) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Both teams cannot be the same.')),
+          );
+        }
+        return;
+      }
+
       final iso =
           '${selectedDate.year.toString().padLeft(4, '0')}-'
           '${selectedDate.month.toString().padLeft(2, '0')}-'
@@ -446,13 +505,25 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
         m.matchTitle = titleCtrl.text.trim();
       }
 
-      await store.persistMatchesOnly();
+      if (m.teamAId != teamAId) {
+        m.teamAId = teamAId;
+        m.xiA = const [];
+        m.tossWinnerId = '';
+      }
+      if (m.teamBId != teamBId) {
+        m.teamBId = teamBId;
+        m.xiB = const [];
+        m.tossWinnerId = '';
+      }
+
+      await store.upsertMatch(m);
+      await _runPlayoffUpdate();
       _triggerCloudSync();
 
       if (mounted) {
         setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Fixture schedule updated successfully!')),
+          const SnackBar(content: Text('Fixture updated successfully!')),
         );
       }
     }

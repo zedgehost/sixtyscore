@@ -5,7 +5,6 @@
 // every device without any server round-trip or extra Firestore path —
 // the profile itself lives inside the account's own scoped data and
 // rides the normal backup sync (users/{uid}/backup/app_data).
-import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 export 'package:cricket_scorer_app/services/auth/user_code.dart';
 
@@ -251,7 +250,7 @@ class AccountTotals {
     };
     var runs = 0;
     var wickets = 0;
-    for (final c in computeCareerStats(store.matches).values) {
+    for (final c in store.getOrComputeCareerStats().values) {
       runs += c.runs;
       wickets += c.wickets;
     }

@@ -155,7 +155,10 @@ Future<Uint8List> buildScorecardPdf(
           widgets.add(pw.Text('Batting', style: subTitle));
           widgets.add(pw.SizedBox(height: 3));
           final batRows = <List<String>>[];
-          for (final pid in inn.battingXI) {
+          final batterIds = inn.battingXI.isNotEmpty
+              ? inn.battingXI
+              : inn.batting.keys.toList();
+          for (final pid in batterIds) {
             final f = inn.batting[pid];
             if (f == null || !f.batted) continue;
             final sr = f.balls == 0
@@ -174,7 +177,7 @@ Future<Uint8List> buildScorecardPdf(
           widgets.add(
             table(['Batter', 'Dismissal', 'R', 'B', '4s', '6s', 'SR'], batRows),
           );
-          final dnb = inn.battingXI
+          final dnb = batterIds
               .where((id) => !(inn.batting[id]?.batted ?? false))
               .map(nameOf)
               .toList();

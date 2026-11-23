@@ -9,6 +9,7 @@ import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/services/sync/cpanel_sync_service.dart';
 import 'package:cricket_scorer_app/views/screens/home/profile_setup_screen.dart';
+import 'package:cricket_scorer_app/views/widgets/app_logo.dart';
 
 class LoginScreen extends StatefulWidget {
   final Store? store;
@@ -235,45 +236,30 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(
-                              width: 82,
-                              height: 82,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: PitchTheme.surfaceContainerLowest,
-                                border: Border.all(
-                                  color: PitchTheme.tertiaryFixed,
-                                  width: 2.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.25),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: ClipOval(
-                                child: Image.asset(
-                                  'assets/app_logo.png',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => const Icon(
-                                    Icons.sports_cricket_rounded,
-                                    size: 42,
-                                    color: PitchTheme.primary,
-                                  ),
-                                ),
-                              ),
-                            ),
+                            const AppLogo(height: 80),
                             const SizedBox(height: 14),
-                            const Text(
-                              'STUMPS',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 2.5,
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Text(
+                                  '60',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                                Text(
+                                  'Score',
+                                  style: TextStyle(
+                                    color: PitchTheme.tertiaryFixed,
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Container(
@@ -327,7 +313,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const SizedBox(height: 6),
                     const Text(
-                      'Welcome to STUMPS',
+                      'Welcome to 60Score',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 22,

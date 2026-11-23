@@ -28,6 +28,7 @@ import 'package:cricket_scorer_app/views/screens/scoring/scoring_screen.dart';
 import 'package:cricket_scorer_app/views/screens/teams/profile_screen.dart';
 import 'package:cricket_scorer_app/views/screens/teams/teams_screen.dart';
 import 'package:cricket_scorer_app/views/screens/tournament/tournaments_screen.dart';
+import 'package:cricket_scorer_app/views/widgets/app_logo.dart';
 import 'package:cricket_scorer_app/views/widgets/guest_guard.dart';
 import 'package:cricket_scorer_app/services/sync/live_match_telemetry_hub.dart';
 
@@ -161,10 +162,47 @@ class _HomeScreenState extends State<HomeScreen>
     _loadCachedFeed();
     store.purgeOrphanTournamentMatches();
     _fetchLiveFeed(silent: true);
-    // Real-time live feed polling: 3.5 seconds when active
-    _feedTimer = Timer.periodic(const Duration(milliseconds: 3500), (_) {
-      if (mounted) _fetchLiveFeed(silent: true);
+  }
+
+  void _scheduleAdaptiveFeedTimer() {
+    _feedTimer?.cancel();
+    // Smoothness: poll every 12 seconds when matches are live, or 30 seconds when idle
+    final intervalMs = _remoteLive.isNotEmpty ? 12000 : 30000;
+    _feedTimer = Timer(Duration(milliseconds: intervalMs), () {
+      if (mounted) {
+        if (_searchQuery.isEmpty) {
+          _fetchLiveFeed(silent: true);
+        } else {
+          _scheduleAdaptiveFeedTimer();
+        }
+      }
     });
+  }
+
+  bool _isFeedListEqual(List<RemoteMatchSummary> a, List<RemoteMatchSummary> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      final x = a[i];
+      final y = b[i];
+      if (x.id != y.id ||
+          x.status != y.status ||
+          x.resultText != y.resultText ||
+          x.updatedAtEpoch != y.updatedAtEpoch ||
+          x.innings.length != y.innings.length) {
+        return false;
+      }
+      for (var j = 0; j < x.innings.length; j++) {
+        final ix = x.innings[j];
+        final iy = y.innings[j];
+        if (ix.totalRuns != iy.totalRuns ||
+            ix.wickets != iy.wickets ||
+            ix.legalBalls != iy.legalBalls ||
+            ix.oversText != iy.oversText) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   @override
@@ -360,12 +398,32 @@ class _HomeScreenState extends State<HomeScreen>
             .where((m) => m.id.isNotEmpty)
             .toList();
 
-        setState(() {
-          _remoteLive = liveList;
-          _remoteRecent = recentList;
+        final feedChanged = !_isFeedListEqual(_remoteLive, liveList) ||
+            !_isFeedListEqual(_remoteRecent, recentList);
+
+        if (feedChanged) {
+          setState(() {
+            _remoteLive = liveList;
+            _remoteRecent = recentList;
+            _loadingFeed = false;
+            _feedOffline = false;
+          });
+
+          // Only write disk cache when data actually changed
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(
+              _kCachedFeedKey,
+              jsonEncode({
+                'live': liveList.map((e) => e.toJson()).toList(),
+                'recent': recentList.map((e) => e.toJson()).toList(),
+              }),
+            );
+          } catch (_) {}
+        } else {
           _loadingFeed = false;
           _feedOffline = false;
-        });
+        }
 
         // Watch ALL active live matches (remote feed + local store + hub memory) in telemetry hub
         final allLiveIds = <String>{
@@ -380,22 +438,15 @@ class _HomeScreenState extends State<HomeScreen>
             store: store,
           );
         }
-
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(
-            _kCachedFeedKey,
-            jsonEncode({
-              'live': liveList.map((e) => e.toJson()).toList(),
-              'recent': recentList.map((e) => e.toJson()).toList(),
-            }),
-          );
-        } catch (_) {}
+        _scheduleAdaptiveFeedTimer();
       } else {
-        setState(() {
-          _loadingFeed = false;
-          _feedOffline = true;
-        });
+        if (mounted) {
+          setState(() {
+            _loadingFeed = false;
+            _feedOffline = true;
+          });
+        }
+        _scheduleAdaptiveFeedTimer();
       }
     } catch (_) {
       if (mounted) {
@@ -404,6 +455,7 @@ class _HomeScreenState extends State<HomeScreen>
           _feedOffline = true;
         });
       }
+      _scheduleAdaptiveFeedTimer();
     }
   }
 
@@ -522,36 +574,36 @@ class _HomeScreenState extends State<HomeScreen>
       ),
       child: Row(
         children: [
-          // STUMPS Logo & Brand Text
+          // 60Score Brand Logo & Text
           GestureDetector(
             onTap: widget.onOpenDrawer,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: PitchTheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.sports_cricket,
-                      color: PitchTheme.tertiaryFixed,
-                      size: 20,
-                    ),
-                  ),
-                ),
+                const AppLogo(height: 34),
                 const SizedBox(width: 8),
-                const Text(
-                  '60Score',
-                  style: TextStyle(
-                    color: PitchTheme.primary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Text(
+                      '60',
+                      style: TextStyle(
+                        color: PitchTheme.primary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.6,
+                      ),
+                    ),
+                    Text(
+                      'Score',
+                      style: TextStyle(
+                        color: PitchTheme.secondary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1389,15 +1441,17 @@ class _HomeScreenState extends State<HomeScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (hasLive) ...[
-                      AnimatedBuilder(
-                        animation: _pulseAnimation,
-                        builder: (context, _) => Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            color: PitchTheme.error
-                                .withValues(alpha: _pulseAnimation.value),
-                            shape: BoxShape.circle,
+                      RepaintBoundary(
+                        child: AnimatedBuilder(
+                          animation: _pulseAnimation,
+                          builder: (context, _) => Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: PitchTheme.error
+                                  .withValues(alpha: _pulseAnimation.value),
+                              shape: BoxShape.circle,
+                            ),
                           ),
                         ),
                       ),
@@ -1443,22 +1497,40 @@ class _HomeScreenState extends State<HomeScreen>
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AnimatedBuilder(
-                  animation: _pulseAnimation,
-                  builder: (context, _) => Container(
-                    width: 9,
-                    height: 9,
-                    decoration: BoxDecoration(
-                      color: PitchTheme.error
-                          .withValues(alpha: _pulseAnimation.value),
-                      shape: BoxShape.circle,
+                if (_activeFilter == 1 || _liveMatchCount > 0)
+                  RepaintBoundary(
+                    child: AnimatedBuilder(
+                      animation: _pulseAnimation,
+                      builder: (context, _) => Container(
+                        width: 9,
+                        height: 9,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: PitchTheme.error
+                              .withValues(alpha: _pulseAnimation.value),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8.0),
+                    child: Icon(
+                      Icons.sports_cricket,
+                      size: 15,
+                      color: PitchTheme.primary,
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'LIVE & RECENT MATCHES',
-                  style: TextStyle(
+                Text(
+                  _activeFilter == 1
+                      ? 'LIVE MATCHES'
+                      : _activeFilter == 2
+                          ? 'TOURNAMENT MATCHES'
+                          : _activeFilter == 3
+                              ? 'CLUB & TEAM MATCHES'
+                              : 'LIVE & RECENT MATCHES',
+                  style: const TextStyle(
                     color: PitchTheme.onSurface,
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
@@ -1529,7 +1601,18 @@ class _HomeScreenState extends State<HomeScreen>
           venue.toLowerCase().contains(_searchQuery);
     }
 
-    final liveOnly = _activeFilter == 1;
+    final filter = _activeFilter;
+    final liveOnly = filter == 1;
+    final tournamentOnly = filter == 2;
+    final clubsOnly = filter == 3;
+
+    bool matchesFilter(_UnifiedMatchCardItem item) {
+      if (liveOnly && !item.isLive) return false;
+      final isTourn = item.tournamentId != null && item.tournamentId!.trim().isNotEmpty;
+      if (tournamentOnly && !isTourn) return false;
+      if (clubsOnly && isTourn) return false;
+      return true;
+    }
 
     // 1. Gather all unique live matches from local store, memory telemetry hub, and remote feed
     final liveMap = <String, _UnifiedMatchCardItem>{};
@@ -1558,7 +1641,9 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
 
-    final liveItems = liveMap.values.where((i) => i.isLive).toList()
+    final liveItems = liveMap.values
+        .where((i) => i.isLive && matchesFilter(i))
+        .toList()
       ..sort((a, b) => b.updatedAtEpoch.compareTo(a.updatedAtEpoch));
 
     // 2. Gather completed / recent matches if not in live-only filter
@@ -1580,13 +1665,15 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
 
-    final completedItems = completedMap.values.toList()
+    final completedItems = completedMap.values
+        .where((i) => !liveMap.containsKey(i.id) && matchesFilter(i))
+        .toList()
       ..sort((a, b) => b.updatedAtEpoch.compareTo(a.updatedAtEpoch));
 
     final displayItems = [...liveItems, ...completedItems];
 
     if (displayItems.isEmpty) {
-      return _buildEmptyMatchesCard(cardWidth, liveOnly: liveOnly);
+      return _buildEmptyMatchesCard(cardWidth, activeFilter: filter);
     }
 
     return SingleChildScrollView(
@@ -1606,7 +1693,34 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildEmptyMatchesCard(double cardWidth, {bool liveOnly = false}) {
+  Widget _buildEmptyMatchesCard(double cardWidth, {int activeFilter = 0}) {
+    final String emptyTitle;
+    final String emptySubtitle;
+    if (_loadingFeed) {
+      emptyTitle = 'Fetching Matches...';
+      emptySubtitle = 'Connecting to server feed...';
+    } else if (activeFilter == 1) {
+      emptyTitle = 'No Live Matches Right Now';
+      emptySubtitle = _feedOffline
+          ? 'Offline mode — live matches will appear here.'
+          : 'Start scoring a live match or tap Refresh.';
+    } else if (activeFilter == 2) {
+      emptyTitle = 'No Tournament Matches Found';
+      emptySubtitle = _feedOffline
+          ? 'No local tournament matches recorded yet.'
+          : 'Create or join a tournament to see scheduled matches.';
+    } else if (activeFilter == 3) {
+      emptyTitle = 'No Club & Team Matches Found';
+      emptySubtitle = _feedOffline
+          ? 'No local bilateral club matches recorded yet.'
+          : 'Start a friendly or club match from Quick Actions.';
+    } else {
+      emptyTitle = 'No Live or Recent Matches';
+      emptySubtitle = _feedOffline
+          ? 'Offline mode — pull down to refresh when online.'
+          : 'Start scoring a match or tap Refresh to check the server.';
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -1649,11 +1763,7 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _loadingFeed
-                      ? 'Fetching Live Matches...'
-                      : liveOnly
-                          ? 'No Live Matches Right Now'
-                          : 'No Live or Recent Matches',
+                  emptyTitle,
                   style: const TextStyle(
                     color: PitchTheme.onSurface,
                     fontSize: 14,
@@ -1664,9 +1774,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  _feedOffline
-                      ? 'Offline mode — pull down to refresh when online.'
-                      : 'Start scoring a match or tap Refresh to check the server.',
+                  emptySubtitle,
                   style: const TextStyle(
                     color: PitchTheme.onSurfaceVariant,
                     fontSize: 12,
@@ -2099,15 +2207,17 @@ class _HomeScreenState extends State<HomeScreen>
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 if (item.isLive) ...[
-                                  AnimatedBuilder(
-                                    animation: _pulseAnimation,
-                                    builder: (context, _) => Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: BoxDecoration(
-                                        color: PitchTheme.error.withValues(
-                                            alpha: _pulseAnimation.value),
-                                        shape: BoxShape.circle,
+                                  RepaintBoundary(
+                                    child: AnimatedBuilder(
+                                      animation: _pulseAnimation,
+                                      builder: (context, _) => Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: BoxDecoration(
+                                          color: PitchTheme.error.withValues(
+                                              alpha: _pulseAnimation.value),
+                                          shape: BoxShape.circle,
+                                        ),
                                       ),
                                     ),
                                   ),

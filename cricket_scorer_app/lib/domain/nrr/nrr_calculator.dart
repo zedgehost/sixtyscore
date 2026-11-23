@@ -117,8 +117,8 @@ NrrScenarioResult? _pointsGate(
     return const NrrScenarioResult(
       possible: false,
       verdict:
-          'Points se hi nahi hoga: ek jeet ke baad bhi team ke points '
-          'rival se kam rahenge.',
+          'Points deficit: Even with a win, the team cannot match or '
+          'exceed the rival on points.',
     );
   }
   if (team.points + 2 > rival.points) return anyWinResult();
@@ -151,7 +151,7 @@ NrrScenarioResult runsMarginNeeded({
   if (teamScore <= 0 || oversQuotaBalls <= 0 || ballsPerOver <= 0) {
     return const NrrScenarioResult(
       possible: false,
-      verdict: 'Score aur overs quota durust darj karen.',
+      verdict: 'Please enter valid score and overs quota.',
     );
   }
   final teamBalls = teamAllOut
@@ -176,8 +176,8 @@ NrrScenarioResult runsMarginNeeded({
     return NrrScenarioResult(
       possible: true,
       verdict:
-          'Koi bhi jeet kafi hai: points par hi team rival se aage '
-          'nikal jayegi, NRR ki zaroorat nahi.',
+          'Any win is sufficient: The team will advance ahead of the '
+          'rival on points alone, without requiring NRR.',
       maxOpponentRuns: teamScore - 1,
       minMargin: 1,
       resultingNrr: t.nrr,
@@ -194,8 +194,8 @@ NrrScenarioResult runsMarginNeeded({
       return NrrScenarioResult(
         possible: true,
         verdict:
-            'NRR par faisla hoga: opponent ko itne runs tak rokna '
-            'hoga ke team ka NRR rival se oopar rahe.',
+            'Decided by NRR: Restrict opponent to this total or lower '
+            'to ensure superior NRR.',
         maxOpponentRuns: oppRuns,
         minMargin: teamScore - oppRuns,
         resultingNrr: t.nrr,
@@ -206,8 +206,8 @@ NrrScenarioResult runsMarginNeeded({
   return NrrScenarioResult(
     possible: false,
     verdict:
-        'Is score par mumkin nahi: opponent ko 0 par out karne par '
-        'bhi team ka NRR rival se oopar nahi jata.',
+        'Not possible at this score: Even bowling out the opponent for 0 '
+        'will not surpass the rival\'s NRR.',
     resultingNrr: best.nrr,
   );
 }
@@ -233,7 +233,7 @@ NrrScenarioResult chaseLatestBalls({
   if (target <= 0 || oversQuotaBalls <= 0 || ballsPerOver <= 0) {
     return const NrrScenarioResult(
       possible: false,
-      verdict: 'Target aur overs quota durust darj karen.',
+      verdict: 'Please enter valid target and overs quota.',
     );
   }
   final oppBalls = oppAllOut ? oversQuotaBalls : oppBallsFaced;
@@ -256,8 +256,8 @@ NrrScenarioResult chaseLatestBalls({
     return NrrScenarioResult(
       possible: true,
       verdict:
-          'Koi bhi jeet kafi hai: points par hi team rival se aage '
-          'nikal jayegi, chase kitni bhi dair mein mukammal ho.',
+          'Any win is sufficient: The team will advance ahead on points '
+          'alone, regardless of how long the chase takes.',
       latestChaseBalls: oversQuotaBalls,
       resultingNrr: t.nrr,
     );
@@ -273,8 +273,8 @@ NrrScenarioResult chaseLatestBalls({
       return NrrScenarioResult(
         possible: true,
         verdict:
-            'NRR par faisla hoga: chase is ball tak mukammal karna '
-            'hoga, warna team ka NRR rival se neeche reh jayega.',
+            'Decided by NRR: Chase must be completed by this ball to '
+            'maintain a superior NRR.',
         latestChaseBalls: balls,
         resultingNrr: t.nrr,
       );
@@ -284,8 +284,8 @@ NrrScenarioResult chaseLatestBalls({
   return NrrScenarioResult(
     possible: false,
     verdict:
-        'Is target par mumkin nahi: pehli ball par chase mukammal '
-        'karne par bhi team ka NRR rival se oopar nahi jata.',
+        'Not possible at this target: Even chasing off the first ball '
+        'will not surpass the rival\'s NRR.',
     resultingNrr: best.nrr,
   );
 }

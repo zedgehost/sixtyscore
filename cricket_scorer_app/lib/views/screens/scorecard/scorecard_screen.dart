@@ -296,59 +296,14 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
             ],
           ),
         ),
-        body: Column(
+        body: TabBarView(
           children: [
-            if (!isScorer)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                color: PitchTheme.surfaceContainerLow,
-                child: Row(
-                  children: [
-                    const Icon(Icons.remove_red_eye_outlined, size: 15, color: PitchTheme.secondary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Spectator Mode • Scorer: ${match.creatorName.isNotEmpty ? match.creatorName : 'Authorized Scorer'}',
-                        style: const TextStyle(
-                          color: PitchTheme.onSurface,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: PitchTheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'READ ONLY',
-                        style: TextStyle(
-                          color: PitchTheme.tertiaryFixed,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  _SummaryTab(store: store, match: match, isScorer: isScorer),
-                  _scorecardTab(context),
-                  _chartsTab(),
-                  _SuperStarsTab(store: store, match: match),
-                  _BallsTab(store: store, match: match, isScorer: isScorer),
-                  _InfoTab(store: store, match: match),
-                ],
-              ),
-            ),
+            _SummaryTab(store: store, match: match, isScorer: isScorer),
+            _scorecardTab(context),
+            _chartsTab(),
+            _SuperStarsTab(store: store, match: match),
+            _BallsTab(store: store, match: match, isScorer: isScorer),
+            _InfoTab(store: store, match: match),
           ],
         ),
         bottomNavigationBar: (match.status == 'live' || match.status == 'upcoming')
@@ -956,15 +911,32 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            nameOf(pid),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: PitchTheme.onSurface,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  nameOf(pid),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: PitchTheme.onSurface,
+                                    fontWeight: (inn.strikerId == pid && !f.out)
+                                        ? FontWeight.w900
+                                        : FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              if (inn.strikerId == pid && !f.out && match.status == 'live') ...[
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.sports_cricket,
+                                  size: 13,
+                                  color: PitchTheme.secondary,
+                                ),
+                              ],
+                            ],
                           ),
                           Text(
                             batFigStatusText(f, nameOf),
@@ -1177,32 +1149,8 @@ class _ScorecardScreenState extends State<ScorecardScreen> {
               ManhattanChart(
                 innings1: manhattanData(i1),
                 innings2: i2 != null ? manhattanData(i2) : const [],
-              ),
-              const SizedBox(height: 10),
-              const Row(
-                children: [
-                  Icon(Icons.square, size: 12, color: Colors.amber),
-                  SizedBox(width: 4),
-                  Text(
-                    'Innings 1',
-                    style: TextStyle(
-                      color: PitchTheme.outline,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  SizedBox(width: 14),
-                  Icon(Icons.square, size: 12, color: PitchTheme.secondary),
-                  SizedBox(width: 4),
-                  Text(
-                    'Innings 2',
-                    style: TextStyle(
-                      color: PitchTheme.outline,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+                label1: store.teamName(i1.battingTeamId),
+                label2: i2 != null ? store.teamName(i2.battingTeamId) : '',
               ),
             ],
           ),
@@ -1302,6 +1250,13 @@ class _SummaryTab extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 14),
+        if (match.status == 'live' &&
+            match.innings.isNotEmpty &&
+            !match.innings.last.isComplete &&
+            (match.innings.last.strikerId.isNotEmpty || match.innings.last.nonStrikerId.isNotEmpty)) ...[
+          _liveCreaseCard(match.innings.last),
+          const SizedBox(height: 14),
+        ],
         for (final inn in match.innings) ...[
           _inningsCard(inn),
           const SizedBox(height: 12),
@@ -1571,6 +1526,274 @@ class _SummaryTab extends StatelessWidget {
     );
   }
 
+  Widget _liveCreaseCard(InningsState inn) {
+    final strikerId = inn.strikerId;
+    final nonStrikerId = inn.nonStrikerId;
+    final sf = strikerId.isNotEmpty ? inn.batting[strikerId] : null;
+    final nsf = nonStrikerId.isNotEmpty ? inn.batting[nonStrikerId] : null;
+
+    final bowlerId = inn.currentBowlerId;
+    final bf = bowlerId.isNotEmpty ? inn.bowling[bowlerId] : null;
+
+    final target = inn.target;
+    final ballsLeft = (match.oversLimit * inn.ballsPerOver) - inn.legalBalls;
+    final needRuns = target > 0 ? (target - inn.totalRuns) : 0;
+    final rrr = (ballsLeft > 0 && needRuns > 0)
+        ? (needRuns * inn.ballsPerOver / ballsLeft).toStringAsFixed(2)
+        : '-';
+    final crr = inn.legalBalls > 0
+        ? (inn.totalRuns * inn.ballsPerOver / inn.legalBalls).toStringAsFixed(2)
+        : '0.00';
+
+    final overNo = inn.legalBalls ~/ inn.ballsPerOver;
+    final overEvents = inn.events.where((e) {
+      if (e.extraType == 'wide') {
+        final bIndex = inn.events.indexOf(e);
+        var legalsBefore = 0;
+        for (var i = 0; i < bIndex; i++) {
+          if (inn.events[i].legalBall) legalsBefore++;
+        }
+        return (legalsBefore ~/ inn.ballsPerOver) == overNo;
+      }
+      return (inn.events.where((x) => x.legalBall && inn.events.indexOf(x) < inn.events.indexOf(e)).length ~/ inn.ballsPerOver) == overNo;
+    }).toList();
+
+    Widget batterRow(String pid, BatFig? f, bool isStriker) {
+      final runs = f?.runs ?? 0;
+      final balls = f?.balls ?? 0;
+      final fours = f?.fours ?? 0;
+      final sixes = f?.sixes ?? 0;
+      final sr = balls == 0 ? '-' : (runs * 100 / balls).toStringAsFixed(1);
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 5,
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      nameOf(pid),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isStriker ? FontWeight.w900 : FontWeight.w600,
+                        color: PitchTheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  if (isStriker) ...[
+                    const SizedBox(width: 5),
+                    const Icon(Icons.sports_cricket, size: 14, color: PitchTheme.secondary),
+                  ],
+                ],
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                '$runs',
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: PitchTheme.primary),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                '$balls',
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontSize: 12, color: PitchTheme.onSurfaceVariant),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                '$fours',
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontSize: 12, color: PitchTheme.onSurfaceVariant),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                '$sixes',
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontSize: 12, color: PitchTheme.onSurfaceVariant),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Text(
+                sr,
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontSize: 12, color: PitchTheme.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: PitchTheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: PitchTheme.cardShadow,
+        border: Border.all(color: PitchTheme.secondary.withValues(alpha: 0.35)),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: PitchTheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.flash_on, size: 13, color: PitchTheme.tertiaryFixed),
+                    SizedBox(width: 4),
+                    Text(
+                      'LIVE CREASE',
+                      style: TextStyle(
+                        color: PitchTheme.tertiaryFixed,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                'CRR: $crr',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: PitchTheme.outline,
+                ),
+              ),
+            ],
+          ),
+          if (target > 0) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: PitchTheme.secondaryContainer.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Target $target • Need $needRuns off $ballsLeft balls (RRR: $rrr)',
+                style: const TextStyle(
+                  color: PitchTheme.onSecondaryContainer,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          const Row(
+            children: [
+              Expanded(
+                flex: 5,
+                child: Text('BATTER', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: PitchTheme.outline)),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text('R', textAlign: TextAlign.right, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: PitchTheme.outline)),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text('B', textAlign: TextAlign.right, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: PitchTheme.outline)),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text('4s', textAlign: TextAlign.right, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: PitchTheme.outline)),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text('6s', textAlign: TextAlign.right, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: PitchTheme.outline)),
+              ),
+              Expanded(
+                flex: 3,
+                child: Text('SR', textAlign: TextAlign.right, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: PitchTheme.outline)),
+              ),
+            ],
+          ),
+          const Divider(height: 12, color: PitchTheme.surfaceContainerLow),
+          if (strikerId.isNotEmpty) batterRow(strikerId, sf, true),
+          if (nonStrikerId.isNotEmpty) batterRow(nonStrikerId, nsf, false),
+          if (bowlerId.isNotEmpty) ...[
+            const Divider(height: 14, color: PitchTheme.surfaceContainerLow),
+            Row(
+              children: [
+                const Icon(Icons.sports_baseball, size: 14, color: PitchTheme.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${nameOf(bowlerId)}: ${oversText(bf?.legalBalls ?? 0, inn.ballsPerOver)} ov, ${bf?.maidens ?? 0}m, ${bf?.runs ?? 0}r, ${bf?.wickets ?? 0}w',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: PitchTheme.onSurface,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (overEvents.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text('This over: ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: PitchTheme.outline)),
+                for (final e in overEvents)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: e.isWicket
+                          ? PitchTheme.error
+                          : (e.batRuns >= 4 && e.extraType == 'none'
+                              ? PitchTheme.secondary
+                              : PitchTheme.surfaceContainerLow),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      e.display,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: (e.isWicket || (e.batRuns >= 4 && e.extraType == 'none'))
+                            ? Colors.white
+                            : PitchTheme.onSurface,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _inningsCard(InningsState inn) {
     final batters = inn.batting.entries.where((e) => e.value.batted).toList()
       ..sort((a, b) => b.value.runs.compareTo(a.value.runs));
@@ -1636,15 +1859,32 @@ class _SummaryTab extends StatelessWidget {
                         child: Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                nameOf(e.key),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: PitchTheme.onSurface,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      nameOf(e.key),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: PitchTheme.onSurface,
+                                        fontWeight: (inn.strikerId == e.key && !e.value.out)
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  if (inn.strikerId == e.key && !e.value.out && match.status == 'live') ...[
+                                    const SizedBox(width: 3),
+                                    const Icon(
+                                      Icons.sports_cricket,
+                                      size: 12,
+                                      color: PitchTheme.secondary,
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                             Text(

@@ -117,13 +117,14 @@ class _ScoringScreenState extends State<ScoringScreen> {
       SyncService().scoringActive = false;
       unawaited(SyncService().syncAfterScoring(store));
     }
+    unawaited(store.flushPendingSaves());
     NavMemory.clear('scoring', match.id);
     CpanelSyncService.cancelDebounce();
     super.dispose();
   }
 
-  void _handleBack() {
-    store.persistMatchesOnly();
+  void _handleBack() async {
+    await store.flushPendingSaves();
     CpanelSyncService.triggerAutoSyncFor(store);
 
     if (Navigator.of(context).canPop()) {
@@ -171,23 +172,9 @@ class _ScoringScreenState extends State<ScoringScreen> {
           match.resultText = computeResult(match, store.teamName);
         }
       }
-      // Smoothness (v1.4.3): per ball, only the matches key is
-      // written — teams/photos and everything else are untouched
-      // by a ball, so re-encoding them per ball was pure load.
-      // v1.4.5 action feedback: per-ball SUCCESS stays silent, but
-      // a failed save must surface (persist returns false instead
-      // of throwing now, so the catch below would never see it).
-      final saved = await store.persistMatchesOnly(skipSync: true);
-      if (!saved) {
-        DebugInfo.record('Ball save failed', StackTrace.current);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Ball could not be saved — try again.'),
-            ),
-          );
-        }
-      }
+      // Smoothness (v1.5.7): per ball, persistence is debounced in the background
+      // so the UI frame finishes in 0ms without waiting for SharedPreferences serialization.
+      store.persistMatchesOnly(skipSync: true, immediate: false);
       await _runPlayoffUpdate();
 
       // Centralized Telemetry Micro-Push (with offline-outbox & reconnect recovery)
@@ -1038,14 +1025,14 @@ class _ScoringScreenState extends State<ScoringScreen> {
             final t2Overs = oversOf(t2StartOvers.text);
             if (score == null || score < 0) {
               setD(() {
-                error = 'Team 1 score theek se likho';
+                error = 'Enter a valid Team 1 score';
                 result = null;
               });
               return;
             }
             if (t2Overs == null || t2Overs < 0) {
               setD(() {
-                error = 'Innings 2 ke overs theek se likho (e.g. 6.3)';
+                error = 'Enter valid Innings 2 overs (e.g. 6.3)';
                 result = null;
               });
               return;
@@ -1058,7 +1045,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
               final wk = int.tryParse(t1Wkts.text.trim());
               if (left == null || wk == null || wk < 0 || wk > 10) {
                 setD(() {
-                  error = 'Innings 1 termination walay numbers theek karo';
+                  error = 'Enter valid Innings 1 termination figures';
                   result = null;
                 });
                 return;
@@ -1077,7 +1064,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
               if (at == null || resumed == null || wk == null ||
                   wk < 0 || wk > 10) {
                 setD(() {
-                  error = 'Interruption walay numbers theek karo';
+                  error = 'Please enter valid interruption values';
                   result = null;
                 });
                 return;
@@ -1206,7 +1193,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Wheel par tap karo — ball kidhar gayi',
+              'Tap on the wheel to plot shot direction',
               style: TextStyle(fontSize: 13, color: PitchTheme.outline),
             ),
             const SizedBox(height: 8),
@@ -1635,6 +1622,39 @@ class _ScoringScreenState extends State<ScoringScreen> {
                         ),
                       ),
                     ),
+                    if (inn.isFreeHit) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: PitchTheme.tertiaryFixed,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: PitchTheme.tertiaryFixed.withValues(alpha: 0.4),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.bolt, size: 13, color: PitchTheme.primary),
+                            SizedBox(width: 2),
+                            Text(
+                              'FREE HIT',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: PitchTheme.primary,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 if (target > 0) ...[
@@ -2383,22 +2403,28 @@ class _ScoringScreenState extends State<ScoringScreen> {
                   ),
                   onPressed: () async {
                     final input = await _ballDialog(
-                      title: 'Wicket',
+                      title: inn.isFreeHit ? 'Wicket (Free Hit)' : 'Wicket',
                       runsEditable: true,
                       runsLabel: 'runs completed (run out)',
-                      wicketTypes: const [
-                        'Bowled',
-                        'Caught',
-                        'LBW',
-                        'Run Out',
-                        'Stumped',
-                        'Hit Wicket',
-                        'Mankad',
-                        'Retired Out',
-                        'Obstructing the Field',
-                        'Hit the Ball Twice',
-                        'Timed Out',
-                      ],
+                      wicketTypes: inn.isFreeHit
+                          ? const [
+                              'Run Out',
+                              'Obstructing the Field',
+                              'Hit the Ball Twice',
+                            ]
+                          : const [
+                              'Bowled',
+                              'Caught',
+                              'LBW',
+                              'Run Out',
+                              'Stumped',
+                              'Hit Wicket',
+                              'Mankad',
+                              'Retired Out',
+                              'Obstructing the Field',
+                              'Hit the Ball Twice',
+                              'Timed Out',
+                            ],
                     );
                     if (input != null && input.isWicket) {
                       if (input.wicketType != 'runOut') input.batRuns = 0;
@@ -2449,6 +2475,7 @@ class _ScoringScreenState extends State<ScoringScreen> {
                   BallInput(
                     extraType: 'noBall',
                     batRuns: input.batRuns,
+                    extraRuns: input.extraRuns,
                     isWicket: input.isWicket,
                     wicketType: input.wicketType,
                     fielderId: input.fielderId,

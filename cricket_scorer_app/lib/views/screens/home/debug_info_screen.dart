@@ -110,7 +110,7 @@ class _DebugInfoScreenState extends State<DebugInfoScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Ye screen sirf maloomat dikhati hai — kuch badalti nahi.',
+            'This screen is for diagnostics only — no stored matches or settings are modified.',
             style: TextStyle(color: PitchTheme.outline, fontSize: 12),
           ),
         ],

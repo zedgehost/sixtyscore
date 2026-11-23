@@ -157,7 +157,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Starting cloud sync to cPanel...'), duration: Duration(seconds: 1)),
     );
-    final ok = await syncService.syncNow();
+    final ok = await syncService.syncNow(force: true);
     if (!mounted) return;
     if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(

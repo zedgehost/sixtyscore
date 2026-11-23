@@ -4,6 +4,7 @@
 // on the same phone NEVER sees — or edits — another identity's data;
 // logging out hides the account's data until that same account logs
 // back in. Cloud sync (per account) lives in sync_service.dart.
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -169,6 +170,29 @@ class Store extends ChangeNotifier implements PlayoffStore {
   bool welcomeDone = true;
   bool loaded = false;
 
+  /// In-memory cache for career stats across matches (prevents redundant O(N) calculations)
+  Map<String, CareerStats>? _careerStatsCache;
+
+  /// Debounce timer & completer for match persistence (prevents disk thrashing during rapid scoring)
+  Timer? _matchSaveDebounceTimer;
+  Completer<bool>? _pendingMatchSaveCompleter;
+
+  void invalidateCareerStatsCache() {
+    _careerStatsCache = null;
+  }
+
+  Map<String, CareerStats> getOrComputeCareerStats({String? tournamentId}) {
+    if (tournamentId != null) {
+      return computeCareerStats(matches, tournamentId: tournamentId);
+    }
+    if (_careerStatsCache == null) {
+      final computed = computeCareerStats(matches);
+      applyManualStats(computed, manualStats);
+      _careerStatsCache = computed;
+    }
+    return _careerStatsCache!;
+  }
+
   static const _kTeams = 'cricscore_teams_v1';
   static const _kTournaments = 'cricscore_tournaments_v1';
   static const _kMatches = 'cricscore_matches_v1';
@@ -237,7 +261,7 @@ class Store extends ChangeNotifier implements PlayoffStore {
 
   /// Computes career stats for any player across all completed/noResult matches.
   CareerStats computeStatsForPlayer(String playerId, {String? playerName}) {
-    final allStats = computeCareerStats(matches);
+    final allStats = getOrComputeCareerStats();
     final targetName = (playerName ?? '').trim().toLowerCase();
 
     // Collect all player IDs that map to this player:
@@ -1300,7 +1324,36 @@ class Store extends ChangeNotifier implements PlayoffStore {
   /// path keeps using [persist] (full write); only the per-ball
   /// path uses this. Playoff updates persist themselves (full
   /// write) on the rare balls when they change something.
-  Future<bool> persistMatchesOnly({bool skipSync = false}) async {
+  /// Ball-path persist (smoothness architecture): writes ONLY the
+  /// matches key. To eliminate UI lag during rapid ball scoring, disk
+  /// serialization is debounced by 600ms when [immediate] is false.
+  /// When leaving the screen or ending match, [flushPendingSaves] or
+  /// [immediate: true] writes to disk synchronously.
+  Future<bool> persistMatchesOnly({bool skipSync = false, bool immediate = false}) async {
+    invalidateCareerStatsCache();
+
+    if (immediate) {
+      _matchSaveDebounceTimer?.cancel();
+      _matchSaveDebounceTimer = null;
+      final ok = await _writeMatchesToDisk(skipSync: skipSync);
+      _pendingMatchSaveCompleter?.complete(ok);
+      _pendingMatchSaveCompleter = null;
+      return ok;
+    }
+
+    _pendingMatchSaveCompleter ??= Completer<bool>();
+    _matchSaveDebounceTimer?.cancel();
+    _matchSaveDebounceTimer = Timer(const Duration(milliseconds: 600), () async {
+      final ok = await _writeMatchesToDisk(skipSync: skipSync);
+      _pendingMatchSaveCompleter?.complete(ok);
+      _pendingMatchSaveCompleter = null;
+      _matchSaveDebounceTimer = null;
+    });
+
+    return true;
+  }
+
+  Future<bool> _writeMatchesToDisk({bool skipSync = false}) async {
     try {
       final p = await SharedPreferences.getInstance();
       await p.setString(
@@ -1315,6 +1368,19 @@ class Store extends ChangeNotifier implements PlayoffStore {
     if (!skipSync) {
       SyncService().schedulePush(this);
       PublishService().scheduleRepublish(this);
+    }
+    return true;
+  }
+
+  /// Flushes any pending debounced match save to disk immediately.
+  Future<bool> flushPendingSaves() async {
+    if (_matchSaveDebounceTimer != null && _matchSaveDebounceTimer!.isActive) {
+      _matchSaveDebounceTimer?.cancel();
+      _matchSaveDebounceTimer = null;
+      final ok = await _writeMatchesToDisk(skipSync: true);
+      _pendingMatchSaveCompleter?.complete(ok);
+      _pendingMatchSaveCompleter = null;
+      return ok;
     }
     return true;
   }

@@ -195,7 +195,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'WELCOME TO STUMPS / 60SCORE',
+                              'WELCOME TO 60SCORE',
                               style: TextStyle(
                                 color: PitchTheme.tertiaryFixed,
                                 fontSize: 10.5,

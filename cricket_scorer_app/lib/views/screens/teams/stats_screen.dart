@@ -12,9 +12,7 @@ import 'package:cricket_scorer_app/views/screens/home/settings_screen.dart';
 import 'package:cricket_scorer_app/views/screens/tournament/tournament_stats.dart';
 
 Map<String, CareerStats> careerOf(Store store) {
-  final map = computeCareerStats(store.matches);
-  applyManualStats(map, store.manualStats);
-  return map;
+  return store.getOrComputeCareerStats();
 }
 
 /// All known persons (team squads + registered players), id -> name.
@@ -548,12 +546,19 @@ class _StatsScreenState extends State<StatsScreen> {
     return store.matches.where((m) => m.oversLimit == _overs).toList();
   }
 
-  /// Career stats over the filtered matches (same computation as before).
+  /// Career stats over the filtered matches (cached when no format filter).
   Map<String, CareerStats> _career() {
-    final map = computeCareerStats(
-      _filteredMatches(),
-      tournamentId: _effectiveTournamentId,
-    );
+    final Map<String, CareerStats> map;
+    if (_overs == null) {
+      map = Map<String, CareerStats>.from(
+        store.getOrComputeCareerStats(tournamentId: _effectiveTournamentId),
+      );
+    } else {
+      map = computeCareerStats(
+        _filteredMatches(),
+        tournamentId: _effectiveTournamentId,
+      );
+    }
     applyManualStats(map, store.manualStats);
     // Stats overrides (v1.4.5) apply AFTER computation AND manual
     // stats, so an edited row beats both — same precedence as a

@@ -154,18 +154,18 @@ class _QualificationChancesScreenState
 
   String _minimumLine(TeamQualification q) {
     if (!q.canQualify) {
-      return 'Kisi surat qualify nahi — sab jeet kar bhi nahi.';
+      return 'Cannot qualify — eliminated from playoff contention.';
     }
     if (q.minWins == 0 && q.minNoResults == 0 && !q.minNeedsOtherResults) {
-      return 'Pehle se qualified — baqi natijon se farq nahi.';
+      return 'Already qualified — position guaranteed.';
     }
     final parts = <String>[];
-    if (q.minWins! > 0) parts.add('${q.minWins} jeet');
+    if (q.minWins! > 0) parts.add('${q.minWins} ${q.minWins == 1 ? "win" : "wins"}');
     if (q.minNoResults! > 0) parts.add('${q.minNoResults} no-result');
     final need = q.minNeedsOtherResults
-        ? ' + doosri teams ke natije bhi chahiye'
-        : ' (doosre natijon se farq nahi)';
-    return 'Kam se kam: ${parts.join(' + ')}$need';
+        ? ' + requires favorable results from other fixtures'
+        : ' (independent of other results)';
+    return 'Minimum requirement: ${parts.join(' + ')}$need';
   }
 
   @override
@@ -190,28 +190,24 @@ class _QualificationChancesScreenState
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
         children: [
           const Text(
-            'Har baqi league match ke 3 natije: jeet (2-0 points), haar '
-            '(0-2), no-result (1-1 points, NRR par koi asar nahi). Tie bhi '
-            '1-1 points hota hai, is liye no-result wahi points case '
-            'cover karta hai — tie alag se nahi ginay gaye.',
+            'Each remaining league fixture evaluates 3 outcomes: Win (2 pts), Loss (0 pts), '
+            'and No Result (1 pt each). Ties are treated identically in points to No Result.',
             style: TextStyle(color: PitchTheme.outline, fontSize: 12.5),
           ),
           const SizedBox(height: 6),
           const Text(
-            'Tie par maujooda NRR se faisla — aane wale matches ke '
-            'margins NRR badal sakte hain.',
+            'Points ties are resolved by Net Run Rate (NRR) based on current standings and match margins.',
             style: TextStyle(color: kGold, fontSize: 12.5),
           ),
           const SizedBox(height: 6),
           const Text(
-            'Ye sirf hisaab hai — table ya matches tabdeel nahi hote.',
+            'This simulation is for forecasting only — official standings and matches remain unchanged.',
             style: TextStyle(color: PitchTheme.outline, fontSize: 12.5),
           ),
           if (analysis != null && analysis.isApproximate) ...[
             const SizedBox(height: 6),
             const Text(
-              'Approx (Monte Carlo, 10,000 samples) — baqi matches zyada '
-              'hain, is liye exact ginna mumkin nahi.',
+              'Approximation (Monte Carlo simulation, 10,000 runs) due to large number of remaining fixtures.',
               style: TextStyle(color: kGold, fontSize: 12.5),
             ),
           ],
@@ -238,7 +234,7 @@ class _QualificationChancesScreenState
             const Padding(
               padding: EdgeInsets.only(top: 16),
               child: Text(
-                'Koi tournament nahi — pehle tournament banayen.',
+                'No tournaments found. Create a tournament first.',
                 style: TextStyle(color: PitchTheme.outline, fontSize: 13),
               ),
             )
@@ -246,7 +242,7 @@ class _QualificationChancesScreenState
             Padding(
               padding: const EdgeInsets.only(top: 12),
               child: Text(
-                '${rem.length} baqi league matches • '
+                '${rem.length} remaining league fixtures • '
                 '${analysis?.combinations ?? 0} combinations'
                 '${analysis != null && analysis.isApproximate ? ' (approx)' : ''}',
                 style: const TextStyle(color: PitchTheme.outline, fontSize: 12.5),
@@ -258,8 +254,7 @@ class _QualificationChancesScreenState
               const Padding(
                 padding: EdgeInsets.only(top: 10),
                 child: Text(
-                  'What-if ke liye kisi team par tap karen — us ke baqi '
-                  'matches ke natije khud set kar ke dekhen.',
+                  'Tap any team to simulate "What-if" scenarios for their remaining fixtures.',
                   style: TextStyle(color: PitchTheme.outline, fontSize: 12.5),
                 ),
               ),
@@ -307,13 +302,12 @@ class _QualificationChancesScreenState
           const SizedBox(height: 4),
           Text(
             '${q.currentPoints} pts • NRR ${q.currentNrr >= 0 ? '+' : ''}${q.currentNrr.toStringAsFixed(3)} • '
-            '${q.remainingMatches} matches baqi',
+            '${q.remainingMatches} matches remaining',
             style: const TextStyle(color: PitchTheme.outline, fontSize: 12.5),
           ),
           const SizedBox(height: 4),
           Text(
-            'NRR sensitivity: ${_pct(q.nrrSensitivity)} scenarios mein '
-            'cutoff par points tie thi',
+            'NRR sensitivity: ${_pct(q.nrrSensitivity)} scenarios involved a points tie at cutoff',
             style: const TextStyle(color: PitchTheme.outline, fontSize: 12.5),
           ),
           Text(
@@ -372,7 +366,7 @@ class _QualificationChancesScreenState
           ),
           if (row != null) ...[
             Text(
-              'Is surat mein qualify: ${_pct(row.qualifyProbability)} • '
+              'Simulated Qualification Chance: ${_pct(row.qualifyProbability)} • '
               'Best: ${_ordinal(row.bestRank)} • '
               'Worst: ${_ordinal(row.worstRank)}',
               style: const TextStyle(color: PitchTheme.outline, fontSize: 12.5),
@@ -381,8 +375,7 @@ class _QualificationChancesScreenState
           ],
           if (myFixtures.isEmpty)
             const Text(
-              'Is team ka koi baqi match nahi — natija sirf doosri '
-              'teams ke matches par munhasir hai.',
+              'This team has completed all fixtures — qualification depends on other teams\' results.',
               style: TextStyle(color: PitchTheme.outline, fontSize: 12.5),
             ),
           for (final j in myFixtures) _whatIfRow(j, rem, teamId),
@@ -395,7 +388,7 @@ class _QualificationChancesScreenState
     );
   }
 
-  /// Dropdown values are from the SELECTED TEAM's view ('Jeet' = the
+  /// Dropdown values are from the SELECTED TEAM's view ('Win' = the
   /// team wins); the analysis stores them from team A's view. These two
   /// helpers convert between the views (no-op when the team is A).
   static QualOutcome _toTeamAView(QualOutcome v, bool teamIsA) {
@@ -433,11 +426,11 @@ class _QualificationChancesScreenState
             ),
             DropdownMenuItem(
               value: QualOutcome.teamAWin,
-              child: Text('Jeet'),
+              child: Text('Win'),
             ),
             DropdownMenuItem(
               value: QualOutcome.teamBWin,
-              child: Text('Haar'),
+              child: Text('Loss'),
             ),
             DropdownMenuItem(
               value: QualOutcome.noResult,

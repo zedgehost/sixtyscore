@@ -67,6 +67,7 @@ void _pushUndo(InningsState s) {
     widePenalty: s.widePenalty,
     noBallPenalty: s.noBallPenalty,
     endedEarly: s.endedEarly,
+    isFreeHit: s.isFreeHit,
   ));
   if (s.undoStack.length > 50) {
     s.undoStack.removeRange(0, s.undoStack.length - 50);
@@ -110,6 +111,7 @@ void _restoreStep(InningsState s, UndoStep step) {
   s.noBallPenalty = step.noBallPenalty;
   s.target = step.target;
   s.endedEarly = step.endedEarly;
+  s.isFreeHit = step.isFreeHit;
 }
 
 /// Set the two openers and first bowler for a fresh innings.
@@ -187,8 +189,19 @@ bool applyBall(InningsState s, BallInput input) {
       input.wicketType != 'obstructing') {
     return false;
   }
+  if (s.isFreeHit &&
+      input.isWicket &&
+      input.wicketType != 'runOut' &&
+      input.wicketType != 'mankad' &&
+      input.wicketType != 'retiredOut' &&
+      input.wicketType != 'obstructing' &&
+      input.wicketType != 'obstructingField' &&
+      input.wicketType != 'hitBallTwice') {
+    return false;
+  }
   _pushUndo(s);
 
+  final wasFreeHit = s.isFreeHit;
   final strikerAtBall = s.strikerId;
   final nonStrikerAtBall = s.nonStrikerId;
   final bowlerId = s.currentBowlerId;
@@ -211,16 +224,17 @@ bool applyBall(InningsState s, BallInput input) {
       rotationRuns = input.extraRuns;
       break;
     case 'noBall':
-      total = (s.noBallPenalty ? 1 : 0) + input.batRuns;
-      s.noBallRuns += s.noBallPenalty ? 1 : 0;
+      final pen = s.noBallPenalty ? 1 : 0;
+      total = pen + input.batRuns + input.extraRuns;
+      s.noBallRuns += pen;
       s.noBallCount++;
-      bowlerRuns = total;
+      bowlerRuns = pen + input.batRuns;
       bowl.noBalls++;
       bat.runs += input.batRuns;
       bat.balls += 1;
       if (input.batRuns == 4) bat.fours++;
       if (input.batRuns == 6) bat.sixes++;
-      rotationRuns = input.batRuns;
+      rotationRuns = input.batRuns + input.extraRuns;
       break;
     case 'bye':
       total = input.batRuns;
@@ -279,6 +293,7 @@ bool applyBall(InningsState s, BallInput input) {
     shotY: input.shotY,
     totalRuns: total,
     legalBall: legal,
+    isFreeHit: wasFreeHit,
   );
   s.events.add(ev);
 
@@ -336,6 +351,15 @@ bool applyBall(InningsState s, BallInput input) {
   if (s.isComplete) {
     s.awaitingBowler = false;
     if (s.wickets >= s.effectiveMaxWickets) s.awaitingBatter = false;
+  }
+  // Free Hit state transition:
+  // A no-ball delivery triggers a Free Hit on the next ball.
+  // If the delivery was legal and was a Free Hit, the Free Hit is consumed.
+  // If the Free Hit delivery was illegal (wide or another no-ball), Free Hit continues.
+  if (input.extraType == 'noBall') {
+    s.isFreeHit = true;
+  } else if (legal && wasFreeHit) {
+    s.isFreeHit = false;
   }
   return true;
 }
@@ -1501,6 +1525,18 @@ Map<String, CareerStats> computeCareerStats(
     // only played+1 / NR+1 / points+1 and no NRR effect, per ICC.)
     if (m.status != 'completed' && m.status != 'noResult') continue;
     final xi = {...m.xiA, ...m.xiB};
+    if (xi.isEmpty) {
+      // In quick matches or casual scoring, xiA/xiB might be empty.
+      // Harvest all active participants from innings figures.
+      for (final inn in m.innings) {
+        xi.addAll(inn.batting.keys);
+        xi.addAll(inn.bowling.keys);
+      }
+      for (final inn in m.superOverInnings) {
+        xi.addAll(inn.batting.keys);
+        xi.addAll(inn.bowling.keys);
+      }
+    }
     for (final pid in xi) {
       get(pid).matches++;
     }

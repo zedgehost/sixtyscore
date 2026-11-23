@@ -89,7 +89,7 @@ class TournamentStatsTab extends StatelessWidget {
 
   List<_StatHeadline> _build() {
     final tid = tournament.id;
-    final career = computeCareerStats(store.matches, tournamentId: tid);
+    final career = store.getOrComputeCareerStats(tournamentId: tid);
     final persons = allPersons(store);
     String nameOf(String id) => persons[id] ?? store.playerName(id);
     final list = career.values.toList();

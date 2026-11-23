@@ -17,12 +17,13 @@ class CpanelSyncService {
   final CpanelApiClient apiClient;
   bool _isSyncing = false;
   static Timer? _debounceTimer;
+  static int _lastSyncedEpoch = 0;
 
   CpanelSyncService({required this.store, required this.apiClient});
 
   bool get isSyncing => _isSyncing;
 
-  /// Fire-and-forget background sync with 3-second debounce.
+  /// Fire-and-forget background sync with 4-second debounce.
   /// Never blocks the UI thread, never lags scoring, completely safe offline.
   void triggerAutoSync() {
     if (SyncService().scoringActive) {
@@ -79,7 +80,8 @@ class CpanelSyncService {
       };
 
   /// Push ALL local store entities & metrics to cPanel MySQL.
-  Future<bool> syncNow() async {
+  /// Skips redundant work if local data has not been modified since last sync.
+  Future<bool> syncNow({bool force = false}) async {
     if (_isSyncing) return false;
     if (SyncService().scoringActive) {
       debugPrint('[CpanelSyncService] Active ball scoring in progress. Cloud sync deferred.');
@@ -91,13 +93,21 @@ class CpanelSyncService {
       return false;
     }
 
+    if (!force && _lastSyncedEpoch > 0) {
+      final lastModified = await store.getLastModified();
+      if (lastModified <= _lastSyncedEpoch) {
+        debugPrint('[CpanelSyncService] Store unmodified since last sync ($lastModified <= $_lastSyncedEpoch). Skipping redundant sync.');
+        return true;
+      }
+    }
+
     _isSyncing = true;
     try {
       // Flush any offline-completed onboarding profile first
       await AuthService().syncPendingOnboardingIfNeeded(apiClient: apiClient);
 
       final nowEpoch = DateTime.now().millisecondsSinceEpoch;
-      final computedStats = computeCareerStats(store.matches);
+      final computedStats = store.getOrComputeCareerStats();
 
       // 1. Complete Matches (preserves ball-by-ball events, wagon wheel shotX/Y, DLS, Super Over, rules)
       final matchPayloads = <Map<String, dynamic>>[
@@ -106,7 +116,7 @@ class CpanelSyncService {
             ...m.toJson(),
             'teamAName': store.teamById(m.teamAId)?.name ?? 'Team A',
             'teamBName': store.teamById(m.teamBId)?.name ?? 'Team B',
-            'updatedAtEpoch': nowEpoch,
+            'updatedAtEpoch': m.updatedAtEpoch > 0 ? m.updatedAtEpoch : nowEpoch,
           },
       ];
 
@@ -203,6 +213,7 @@ class CpanelSyncService {
       );
 
       if (res['status'] == 'success') {
+        _lastSyncedEpoch = DateTime.now().millisecondsSinceEpoch;
         debugPrint('[CpanelSyncService] Full batch sync completed: ${res['data']}');
         return true;
       } else {
@@ -247,6 +258,7 @@ class CpanelSyncService {
 
       final payload = Map<String, dynamic>.from(res['data'] as Map<String, dynamic>);
       final counts = await store.importJson(payload, merge: true);
+      _lastSyncedEpoch = DateTime.now().millisecondsSinceEpoch;
       debugPrint('[CpanelSyncService] Cloud pull & merge completed: $counts');
       return counts;
     } catch (e) {

@@ -31,6 +31,7 @@ Future<Tournament?> showTournamentEditDialog(
   var logoBase64 = existing?.logoBase64 ?? '';
   var oversLimit = existing?.oversLimit ?? 8;
   var format = existing?.format.isNotEmpty == true ? existing!.format : 'Round Robin';
+  var playoffFormat = existing?.playoffFormat ?? (format == 'League + Playoffs' ? 'semis' : 'none');
   var ballType = existing?.ballType.isNotEmpty == true ? existing!.ballType : 'Tennis Ball';
   var startDateIso = existing?.startDateIso.isNotEmpty == true
       ? existing!.startDateIso
@@ -272,7 +273,64 @@ Future<Tournament?> showTournamentEditDialog(
                                       fontSize: 12,
                                     ),
                                     onSelected: (val) {
-                                      if (val) setD(() => format = f);
+                                      if (val) {
+                                        setD(() {
+                                          format = f;
+                                          if (f == 'League + Playoffs' && playoffFormat == 'none') {
+                                            playoffFormat = 'semis';
+                                          } else if (f == 'Round Robin' && playoffFormat == 'semis') {
+                                            playoffFormat = 'none';
+                                          }
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // 2b. Knockout / Playoff Structure
+                        const Text(
+                          'PLAYOFF / KNOCKOUT STRUCTURE',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            color: PitchTheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: Row(
+                            children: [
+                              for (final opt in [
+                                {'id': 'semis', 'label': 'Semifinals & Final (1v4, 2v3)'},
+                                {'id': 'page', 'label': 'IPL / Page Playoff (Q1, Elim, Q2, Final)'},
+                                {'id': 'direct_final', 'label': 'Direct Final (Top 2)'},
+                                {'id': 'none', 'label': 'None (Table Topper Wins)'},
+                              ])
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: ChoiceChip(
+                                    label: Text(opt['label']!),
+                                    selected: playoffFormat == opt['id'],
+                                    selectedColor: PitchTheme.primary,
+                                    backgroundColor: PitchTheme.surfaceContainerLow,
+                                    labelStyle: TextStyle(
+                                      color: playoffFormat == opt['id']
+                                          ? PitchTheme.tertiaryFixed
+                                          : PitchTheme.onSurface,
+                                      fontWeight: playoffFormat == opt['id']
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                    onSelected: (val) {
+                                      if (val) setD(() => playoffFormat = opt['id']!);
                                     },
                                   ),
                                 ),
@@ -803,6 +861,7 @@ Future<Tournament?> showTournamentEditDialog(
       logoBase64: logoBase64,
       oversLimit: oversLimit,
       format: format,
+      playoffFormat: playoffFormat,
       ballType: ballType,
       startDateIso: startDateIso,
       creatorId: store.effectiveUserId,
@@ -824,6 +883,7 @@ Future<Tournament?> showTournamentEditDialog(
   existing.logoBase64 = logoBase64;
   existing.oversLimit = oversLimit;
   existing.format = format;
+  existing.playoffFormat = playoffFormat;
   existing.ballType = ballType;
   existing.startDateIso = startDateIso;
   existing.teamIds = selectedTeamIds;

@@ -15,6 +15,7 @@ abstract class PlayoffStore {
   String teamName(String id);
   List<Match> get matches;
   Future<void> persist();
+  Future<void> upsertMatch(Match m);
 }
 
 /// Outcome of a playoff recalculation pass.
@@ -194,7 +195,7 @@ Future<PlayoffUpdate> applyPlayoffUpdate(
   final notes = <String>[];
 
   Match? playoffByStage(String stage) {
-    for (final m in all) {
+    for (final m in store.matches) {
       if (m.tournamentId == tournamentId && m.stage == stage) return m;
     }
     return null;
@@ -203,12 +204,12 @@ Future<PlayoffUpdate> applyPlayoffUpdate(
   bool playoffStarted(Match? m) =>
       m != null && (m.status == 'live' || m.status == 'completed');
 
-  final sf1 = playoffByStage('semifinal1');
-  final sf2 = playoffByStage('semifinal2');
-  final q1 = playoffByStage('qualifier1');
-  final elim = playoffByStage('eliminator');
-  final q2 = playoffByStage('qualifier2');
-  final fin = playoffByStage('final');
+  var sf1 = playoffByStage('semifinal1');
+  var sf2 = playoffByStage('semifinal2');
+  var q1 = playoffByStage('qualifier1');
+  var elim = playoffByStage('eliminator');
+  var q2 = playoffByStage('qualifier2');
+  var fin = playoffByStage('final');
   final anyPlayoffStarted = playoffStarted(sf1) ||
       playoffStarted(sf2) ||
       playoffStarted(q1) ||
@@ -253,6 +254,80 @@ Future<PlayoffUpdate> applyPlayoffUpdate(
             'Reseeding is blocked to protect completed playoff matches.',
         finalQualifiers: storedQ,
       );
+    }
+
+    // ---------- Auto-create Playoff Fixtures if none exist ----------
+    final existingPlayoffs = playoffMatchesOf(tournamentId, store.matches);
+    if (existingPlayoffs.isEmpty && t.playoffFormat != 'none' && finalQ.isNotEmpty) {
+      DateTime baseDate = DateTime.now();
+      if (league.isNotEmpty) {
+        for (final m in league) {
+          final p = DateTime.tryParse(m.dateIso);
+          if (p != null && p.isAfter(baseDate)) {
+            baseDate = p;
+          }
+        }
+      }
+      final overs = t.oversLimit;
+      final ballType = t.ballType.isNotEmpty ? t.ballType : 'Tennis Ball';
+      final venue = t.venue;
+
+      Match makePlayoffMatch(String stage, String title, int dayOffset, String teamA, String teamB) {
+        return Match(
+          id: 'playoff_${t.id}_${stage}_${DateTime.now().millisecondsSinceEpoch}_$dayOffset',
+          tournamentId: t.id,
+          teamAId: teamA,
+          teamBId: teamB,
+          xiA: const [],
+          xiB: const [],
+          oversLimit: overs,
+          ballsPerOver: 6,
+          venue: venue,
+          dateIso: baseDate.add(Duration(days: dayOffset)).toIso8601String(),
+          stage: stage,
+          matchTitle: title,
+          ballType: ballType,
+          status: 'upcoming',
+          tossWinnerId: '',
+          tossDecision: 'bat',
+          creatorId: t.creatorId,
+        );
+      }
+
+      if (t.playoffFormat == 'semis' && finalQ.length >= 4) {
+        final newSf1 = makePlayoffMatch('semifinal1', 'Semi Final 1 (1st vs 4th)', 1, finalQ[0], finalQ[3]);
+        final newSf2 = makePlayoffMatch('semifinal2', 'Semi Final 2 (2nd vs 3rd)', 1, finalQ[1], finalQ[2]);
+        final newFin = makePlayoffMatch('final', 'Grand Final', 2, '', '');
+        await store.upsertMatch(newSf1);
+        await store.upsertMatch(newSf2);
+        await store.upsertMatch(newFin);
+        changed = true;
+        notes.add('Auto-scheduled Semifinals & Grand Final');
+      } else if (t.playoffFormat == 'page' && finalQ.length >= 4) {
+        final newQ1 = makePlayoffMatch('qualifier1', 'Qualifier 1 (1st vs 2nd)', 1, finalQ[0], finalQ[1]);
+        final newElim = makePlayoffMatch('eliminator', 'Eliminator (3rd vs 4th)', 1, finalQ[2], finalQ[3]);
+        final newQ2 = makePlayoffMatch('qualifier2', 'Qualifier 2 (Q1 Loser vs Elim Winner)', 2, '', '');
+        final newFin = makePlayoffMatch('final', 'Grand Final', 3, '', '');
+        await store.upsertMatch(newQ1);
+        await store.upsertMatch(newElim);
+        await store.upsertMatch(newQ2);
+        await store.upsertMatch(newFin);
+        changed = true;
+        notes.add('Auto-scheduled IPL Page Playoffs & Grand Final');
+      } else if ((t.playoffFormat == 'direct_final' || finalQ.length < 4) && finalQ.length >= 2) {
+        final newFin = makePlayoffMatch('final', 'Grand Final (1st vs 2nd)', 1, finalQ[0], finalQ[1]);
+        await store.upsertMatch(newFin);
+        changed = true;
+        notes.add('Auto-scheduled Direct Grand Final');
+      }
+
+      // Re-resolve playoff fixture references after creation
+      sf1 = playoffByStage('semifinal1');
+      sf2 = playoffByStage('semifinal2');
+      q1 = playoffByStage('qualifier1');
+      elim = playoffByStage('eliminator');
+      q2 = playoffByStage('qualifier2');
+      fin = playoffByStage('final');
     }
 
     // ---------- Semifinal seeding (1v4, 2v3) ----------
@@ -312,15 +387,22 @@ Future<PlayoffUpdate> applyPlayoffUpdate(
     if (playoffStarted(fin)) return; // final already underway — hands off
     final winner = matchWinnerId(semi);
     if (winner == null) return; // tie / unfinished / no-result: slot stays TBD
-    if (toTeamA && fin.teamAId != winner) {
-      fin.teamAId = winner;
-      changed = true;
-      notes.add('Grand Final Team A: ${store.teamName(winner)}');
+    if (toTeamA && (fin.teamAId.isEmpty || fin.teamAId == semi.teamAId || fin.teamAId == semi.teamBId)) {
+      if (fin.teamAId != winner) {
+        fin.teamAId = winner;
+        changed = true;
+        notes.add('Grand Final Team A: ${store.teamName(winner)}');
+      }
     }
-    if (!toTeamA && fin.teamBId != winner) {
-      fin.teamBId = winner;
-      changed = true;
-      notes.add('Grand Final Team B: ${store.teamName(winner)}');
+    if (!toTeamA && (fin.teamBId.isEmpty || fin.teamBId == semi.teamAId || fin.teamBId == semi.teamBId)) {
+      if (fin.teamBId != winner) {
+        fin.teamBId = winner;
+        changed = true;
+        notes.add('Grand Final Team B: ${store.teamName(winner)}');
+      }
+    }
+    if (fin.teamAId.isNotEmpty && fin.teamBId.isNotEmpty) {
+      fin.matchTitle = 'Grand Final (${store.teamName(fin.teamAId)} vs ${store.teamName(fin.teamBId)})';
     }
   }
 

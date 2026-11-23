@@ -288,7 +288,7 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
 
   void _startFocusedPolling() {
     _focusedPollTimer?.cancel();
-    _focusedPollTimer = Timer.periodic(const Duration(milliseconds: 2200), (_) {
+    _focusedPollTimer = Timer.periodic(const Duration(milliseconds: 5000), (_) {
       if (_focusedMatchId != null) {
         pollMatch(_focusedMatchId!);
       }
@@ -297,7 +297,7 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
 
   void _startBackgroundPolling() {
     _backgroundPollTimer?.cancel();
-    _backgroundPollTimer = Timer.periodic(const Duration(milliseconds: 6000), (_) {
+    _backgroundPollTimer = Timer.periodic(const Duration(milliseconds: 15000), (_) {
       _pollWatchedMatches();
     });
   }

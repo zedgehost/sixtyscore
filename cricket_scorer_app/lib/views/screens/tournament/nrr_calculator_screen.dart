@@ -132,24 +132,24 @@ class _NrrCalculatorScreenState extends State<NrrCalculatorScreen> {
       _result = null;
       _error = null;
       if (t == null || team == null || rival == null) {
-        _error = 'Tournament, team aur rival chunen.';
+        _error = 'Please select a tournament, team, and rival.';
         return;
       }
       if (team.teamId == rival.teamId) {
-        _error = 'Team aur rival alag alag hone chahiye.';
+        _error = 'Team and rival must be different.';
         return;
       }
       final bpo = _ballsPerOver;
       final quota = ballsFromOversText(_quotaCtrl.text, bpo);
       if (quota == null || quota <= 0) {
-        _error = 'Overs quota durust likhen (masalan 8 ya 7.3).';
+        _error = 'Enter a valid overs quota (e.g. 20 or 19.3).';
         return;
       }
       final score = int.tryParse(_scoreCtrl.text.trim());
       if (score == null || score <= 0) {
         _error = _mode == 0
-            ? 'Apni team ka score darj karen.'
-            : 'Opponent ka score darj karen.';
+            ? 'Enter your team\'s score.'
+            : 'Enter the opponent\'s score.';
         return;
       }
       if (_mode == 0) {
@@ -157,7 +157,7 @@ class _NrrCalculatorScreenState extends State<NrrCalculatorScreen> {
         if (_teamBallsCtrl.text.trim().isNotEmpty) {
           ballsFaced = ballsFromOversText(_teamBallsCtrl.text, bpo);
           if (ballsFaced == null || ballsFaced <= 0 || ballsFaced > quota) {
-            _error = 'Balls faced durust likhen (masalan 6.2).';
+            _error = 'Enter valid balls faced (e.g. 19.2).';
             return;
           }
         }
@@ -175,7 +175,7 @@ class _NrrCalculatorScreenState extends State<NrrCalculatorScreen> {
         if (_oppBallsCtrl.text.trim().isNotEmpty) {
           final parsed = ballsFromOversText(_oppBallsCtrl.text, bpo);
           if (parsed == null || parsed <= 0 || parsed > quota) {
-            _error = 'Opponent ke balls faced durust likhen.';
+            _error = 'Enter valid balls faced for the opponent.';
             return;
           }
           oppBalls = parsed;
@@ -219,8 +219,7 @@ class _NrrCalculatorScreenState extends State<NrrCalculatorScreen> {
     if (res == null || team == null || rival == null) {
       return const ScoreCard(
         child: Text(
-          'Team, rival aur score chun kar "Calculate" dabayen — '
-          'natija yahan ayega.',
+          'Select team, rival, and score then tap "Calculate" to view results.',
           style: TextStyle(color: PitchTheme.outline, fontSize: 13),
         ),
       );
@@ -229,23 +228,17 @@ class _NrrCalculatorScreenState extends State<NrrCalculatorScreen> {
     final rivalName = store.teamName(rival.teamId);
     final String headline;
     if (!res.possible) {
-      headline = '$teamName is scenario mein $rivalName se aage nahi '
-          'nikal sakta.';
+      headline = '$teamName cannot overtake $rivalName in this scenario.';
     } else if (_mode == 0) {
       headline = res.minMargin == 1
-          ? '$teamName ko koi bhi jeet kafi hai — kam se kam 1 run se '
-                'jeetna hoga (opponent ko ${res.maxOpponentRuns} tak '
-                'rokna hoga).'
-          : '$teamName ko kam se kam ${res.minMargin} runs se jeetna '
-                'hoga — opponent ko ${res.maxOpponentRuns} runs tak '
-                'rokna hoga.';
+          ? 'Any win is enough for $teamName — must restrict opponent to ${res.maxOpponentRuns} runs.'
+          : '$teamName must win by at least ${res.minMargin} runs — restricting opponent to ${res.maxOpponentRuns} runs.';
     } else {
       final balls = res.latestChaseBalls!;
       final bpo = _ballsPerOver;
       final overNo = (balls - 1) ~/ bpo + 1;
       final ballNo = (balls - 1) % bpo + 1;
-      headline = '$teamName ko chase ${oversText(balls, bpo)} overs tak '
-          'mukammal karna hoga — yani over $overNo ki ball $ballNo tak.';
+      headline = '$teamName must complete the chase within ${oversText(balls, bpo)} overs (over $overNo, ball $ballNo).';
     }
     return ScoreCard(
       highlight: res.possible,
@@ -280,9 +273,9 @@ class _NrrCalculatorScreenState extends State<NrrCalculatorScreen> {
           if (res.resultingNrr != null) ...[
             const SizedBox(height: 8),
             Text(
-              'Is case mein $teamName ka NRR ${_nrrText(res.resultingNrr!)} '
-              'hoga — $rivalName ka maujooda NRR ${_nrrText(rival.nrr)} '
-              '(${rival.points} pts) hai.',
+              'In this scenario, $teamName will have an NRR of ${_nrrText(res.resultingNrr!)} '
+              'vs $rivalName\'s current NRR of ${_nrrText(rival.nrr)} '
+              '(${rival.points} pts).',
               style: const TextStyle(color: PitchTheme.outline, fontSize: 12.5),
             ),
           ],
@@ -338,9 +331,8 @@ class _NrrCalculatorScreenState extends State<NrrCalculatorScreen> {
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
         children: [
           const Text(
-            'Points table par maujooda position se hisaab: aap ki team '
-            'ko rival se aage nikalne ke liye kya karna hoga. Ye sirf '
-            'calculator hai — table ya matches tabdeel nahi hote.',
+            'Calculate what your team needs to overtake a rival on Net Run Rate (NRR) '
+            'based on current standings. This simulation does not modify actual tables or matches.',
             style: TextStyle(color: PitchTheme.outline, fontSize: 12.5),
           ),
           const SizedBox(height: 10),

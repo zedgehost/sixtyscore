@@ -322,6 +322,10 @@ class Tournament {
   /// Tournament starting date in ISO-8601 format (YYYY-MM-DD)
   String startDateIso;
 
+  /// Knockout / Playoff structure: 'semis' (1v4, 2v3, Final), 'page' (IPL: Q1, Elim, Q2, Final),
+  /// 'direct_final' (Top 2 Teams Final), or 'none' (Round Robin Only / Table Topper Wins).
+  String playoffFormat;
+
   Tournament({
     required this.id,
     required this.name,
@@ -332,6 +336,7 @@ class Tournament {
     this.format = 'Round Robin',
     this.ballType = 'Tennis Ball',
     this.startDateIso = '',
+    this.playoffFormat = 'semis',
     Map<String, int>? pointsAdjustments,
     Map<String, PointsTableOverride>? pointsTableOverrides,
     Map<String, PlayerStatsOverride>? playerStatsOverrides,
@@ -368,6 +373,7 @@ class Tournament {
     'qualificationFinalized': qualificationFinalized,
     'published': published,
     'oversLimit': oversLimit,
+    'playoffFormat': playoffFormat,
   };
 
   factory Tournament.fromJson(Map<String, dynamic> j) {
@@ -432,6 +438,8 @@ class Tournament {
       published: j['published'] as bool? ?? false,
       oversLimit: (j['oversLimit'] as num?)?.toInt() ?? 8,
       format: j['format'] as String? ?? 'Round Robin',
+      playoffFormat: j['playoffFormat'] as String? ??
+          (j['format'] == 'League + Playoffs' ? 'semis' : 'none'),
       ballType: j['ballType'] as String? ?? 'Tennis Ball',
       startDateIso: j['startDateIso'] as String? ?? '',
     );
@@ -459,6 +467,7 @@ class BallEvent {
   double? shotY; // wagon-wheel shot point, normalized -1..1 (boundary = 1.0)
   int totalRuns; // total team runs from this delivery
   bool legalBall;
+  bool isFreeHit;
 
   BallEvent({
     this.inningsNo = 1,
@@ -477,6 +486,7 @@ class BallEvent {
     this.shotY,
     this.totalRuns = 0,
     this.legalBall = true,
+    this.isFreeHit = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -496,6 +506,7 @@ class BallEvent {
     'shotY': shotY,
     'totalRuns': totalRuns,
     'legalBall': legalBall,
+    'isFreeHit': isFreeHit,
   };
 
   factory BallEvent.fromJson(Map<String, dynamic> j) => BallEvent(
@@ -517,6 +528,7 @@ class BallEvent {
         _legacyZonePoint((j['zone'] as num?)?.toInt()).$2,
     totalRuns: (j['totalRuns'] as num?)?.toInt() ?? 0,
     legalBall: j['legalBall'] as bool? ?? true,
+    isFreeHit: j['isFreeHit'] as bool? ?? false,
   );
 
   /// Short display, e.g. "4", "W", "1wd", "1nb", "2b".
@@ -703,6 +715,7 @@ class UndoStep {
   bool widePenalty;
   bool noBallPenalty;
   bool endedEarly;
+  bool isFreeHit;
 
   UndoStep({
     required this.totalRuns,
@@ -731,6 +744,7 @@ class UndoStep {
     required this.widePenalty,
     required this.noBallPenalty,
     this.endedEarly = false,
+    this.isFreeHit = false,
   });
 
   /// Delta steps only: scalars + figure copies + lengths. No events,
@@ -762,6 +776,7 @@ class UndoStep {
         'widePenalty': widePenalty,
         'noBallPenalty': noBallPenalty,
         'endedEarly': endedEarly,
+        'isFreeHit': isFreeHit,
       };
 
   factory UndoStep.fromJson(Map<String, dynamic> j) {
@@ -814,6 +829,7 @@ class UndoStep {
       widePenalty: j['widePenalty'] as bool? ?? true,
       noBallPenalty: j['noBallPenalty'] as bool? ?? true,
       endedEarly: j['endedEarly'] as bool? ?? false,
+      isFreeHit: j['isFreeHit'] as bool? ?? false,
     );
   }
 }
@@ -860,6 +876,7 @@ class InningsState {
   // innings-break card (Start 2nd innings / match finish) appears.
   // Old JSON without the key loads as false (not ended).
   bool endedEarly = false;
+  bool isFreeHit = false;
 
   int get effectiveMaxWickets {
     if (maxWickets > 0) return maxWickets;
@@ -918,6 +935,7 @@ class InningsState {
     'noBallPenalty': noBallPenalty,
     'target': target,
     'endedEarly': endedEarly,
+    'isFreeHit': isFreeHit,
   };
 
   factory InningsState.fromJson(Map<String, dynamic> j) {
@@ -1004,6 +1022,7 @@ class InningsState {
     s.noBallPenalty = j['noBallPenalty'] as bool? ?? true;
     s.target = (j['target'] as num?)?.toInt() ?? 0;
     s.endedEarly = j['endedEarly'] as bool? ?? false;
+    s.isFreeHit = j['isFreeHit'] as bool? ?? false;
     return s;
   }
 }
@@ -1067,6 +1086,7 @@ class Match {
   String creatorId; // Account/User UID of match creator
   String creatorName; // Display name of match creator
   String creatorCode; // 6-character unique code of creator (e.g. 60S-XXXXXX)
+  int updatedAtEpoch;
 
   Match({
     required this.id,
@@ -1097,6 +1117,7 @@ class Match {
     this.creatorId = '',
     this.creatorName = '',
     this.creatorCode = '',
+    this.updatedAtEpoch = 0,
   }) : innings = innings ?? [],
        superOverInnings = superOverInnings ?? [];
 
@@ -1156,6 +1177,7 @@ class Match {
     'creatorId': creatorId,
     'creatorName': creatorName,
     'creatorCode': creatorCode,
+    'updatedAtEpoch': updatedAtEpoch > 0 ? updatedAtEpoch : DateTime.now().millisecondsSinceEpoch,
   };
 
   factory Match.fromJson(Map<String, dynamic> j) {
@@ -1193,6 +1215,9 @@ class Match {
       creatorId: j['creatorId'] as String? ?? j['creator_id'] as String? ?? '',
       creatorName: j['creatorName'] as String? ?? j['creator_name'] as String? ?? '',
       creatorCode: j['creatorCode'] as String? ?? j['creator_code'] as String? ?? '',
+      updatedAtEpoch: (j['updatedAtEpoch'] as num?)?.toInt() ??
+          (j['updated_at_epoch'] as num?)?.toInt() ??
+          0,
     );
     // v1.3.4: standard matches saved by older builds can carry an
     // impossible 11-wicket innings (the old "11 wickets" setup

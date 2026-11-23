@@ -1,11 +1,11 @@
 {
-    "name": "cricket_scorer_app",
-    "short_name": "cricket_scorer_app",
+    "name": "60Score",
+    "short_name": "60Score",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F9F9FF",
+    "theme_color": "#00261B",
+    "description": "60Score — Offline-first Cricket Scoring & Tournament Management",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
