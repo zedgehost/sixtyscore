@@ -6,6 +6,8 @@ import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
 import 'package:cricket_scorer_app/views/screens/scoring/match_toss_screen.dart';
+import 'package:cricket_scorer_app/core/constants/preset_team_logos.dart';
+import 'package:cricket_scorer_app/views/widgets/preset_pickers.dart';
 
 /// Dotted circle painter for the team selection placeholders
 class DottedCirclePainter extends CustomPainter {
@@ -496,60 +498,116 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
 
   void _quickCreateTeam({required bool isTeamA}) {
     final nameCtrl = TextEditingController();
+    final codeCtrl = TextEditingController();
+    PresetTeamLogo? selectedLogo;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: PitchTheme.surfaceContainerLowest,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Create ${isTeamA ? 'Team A' : 'Team B'}',
-          style: const TextStyle(
-            color: PitchTheme.onSurface,
-            fontWeight: FontWeight.w900,
-            fontSize: 18,
-          ),
-        ),
-        content: TextField(
-          controller: nameCtrl,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Team Name',
-            hintText: 'e.g. Lahore Strikers',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = nameCtrl.text.trim();
-              if (name.isEmpty) return;
-              final newTeam = Team(
-                id: Store.newId('team'),
-                name: name,
-                players: [],
-              );
-              await store.upsertTeam(newTeam);
-              setState(() {
-                if (isTeamA) {
-                  teamAId = newTeam.id;
-                } else {
-                  teamBId = newTeam.id;
-                }
-                _preselect();
-              });
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: PitchTheme.primary,
-              foregroundColor: Colors.white,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) => AlertDialog(
+          backgroundColor: PitchTheme.surfaceContainerLowest,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Create ${isTeamA ? 'Team A' : 'Team B'}',
+            style: const TextStyle(
+              color: PitchTheme.onSurface,
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
             ),
-            child: const Text('Create & Select'),
           ),
-        ],
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Logo picker preview
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await showTeamLogoPicker(ctx);
+                      if (picked != null) {
+                        setStateDialog(() => selectedLogo = picked);
+                      }
+                    },
+                    child: Column(
+                      children: [
+                        PresetTeamLogoBadge(
+                          logoKey: selectedLogo?.id ?? '',
+                          teamName: nameCtrl.text.trim().isEmpty ? 'TM' : nameCtrl.text.trim(),
+                          size: 64,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          selectedLogo == null ? 'Tap to pick logo' : 'Tap to change',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: PitchTheme.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: nameCtrl,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Team Name',
+                      hintText: 'e.g. Lahore Strikers',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: codeCtrl,
+                    maxLength: 4,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: 'Short Code (optional)',
+                      hintText: 'e.g. LST',
+                      border: OutlineInputBorder(),
+                      counterText: '',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) return;
+                final newTeam = Team(
+                  id: Store.newId('team'),
+                  name: name,
+                  players: [],
+                  logo: selectedLogo?.id ?? '',
+                  shortCode: codeCtrl.text.trim().toUpperCase(),
+                );
+                await store.upsertTeam(newTeam);
+                setState(() {
+                  if (isTeamA) {
+                    teamAId = newTeam.id;
+                  } else {
+                    teamBId = newTeam.id;
+                  }
+                  _preselect();
+                });
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: PitchTheme.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Create & Select'),
+            ),
+          ],
+        ),
       ),
     );
   }

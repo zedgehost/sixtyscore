@@ -29,7 +29,7 @@ import 'package:cricket_scorer_app/views/screens/teams/profile_screen.dart';
 import 'package:cricket_scorer_app/views/screens/teams/teams_screen.dart';
 import 'package:cricket_scorer_app/views/screens/tournament/tournaments_screen.dart';
 import 'package:cricket_scorer_app/views/widgets/app_logo.dart';
-import 'package:cricket_scorer_app/views/widgets/guest_guard.dart';
+import 'package:cricket_scorer_app/core/constants/preset_team_logos.dart';
 import 'package:cricket_scorer_app/services/sync/live_match_telemetry_hub.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -66,6 +66,15 @@ class _UnifiedMatchCardItem {
   final String teamBId;
   final String teamAName;
   final String teamBName;
+  final String teamALogo;
+  final String teamBLogo;
+  final String teamACode;
+  final String teamBCode;
+
+  final String? teamARuns;
+  final String? teamAOvers;
+  final String? teamBRuns;
+  final String? teamBOvers;
 
   final String? teamAScore;
   final String? teamBScore;
@@ -74,6 +83,7 @@ class _UnifiedMatchCardItem {
 
   final String activeOversText;
   final double activeCrr;
+  final double activeRrr;
   final int activeTarget;
   final bool canScore;
 
@@ -95,12 +105,21 @@ class _UnifiedMatchCardItem {
     required this.teamBId,
     required this.teamAName,
     required this.teamBName,
+    this.teamALogo = '',
+    this.teamBLogo = '',
+    this.teamACode = '',
+    this.teamBCode = '',
+    this.teamARuns,
+    this.teamAOvers,
+    this.teamBRuns,
+    this.teamBOvers,
     required this.teamAScore,
     required this.teamBScore,
     required this.isTeamABatting,
     required this.isTeamBBatting,
     required this.activeOversText,
     required this.activeCrr,
+    this.activeRrr = 0.0,
     required this.activeTarget,
     required this.canScore,
     this.localMatch,
@@ -539,8 +558,6 @@ class _HomeScreenState extends State<HomeScreen>
                             _buildActiveTournamentsSection(),
                             const SizedBox(height: 22),
 
-                            // SECTION 5: DIRECTORIES
-                            _buildDirectoriesSection(),
                             const SizedBox(height: 32),
                           ],
                         ),
@@ -563,12 +580,18 @@ class _HomeScreenState extends State<HomeScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
       decoration: BoxDecoration(
-        color: PitchTheme.surfaceContainerLowest,
+        color: PitchTheme.cardBg,
+        border: const Border(
+          bottom: BorderSide(
+            color: PitchTheme.hairlineBorder,
+            width: 0.9,
+          ),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -588,7 +611,7 @@ class _HomeScreenState extends State<HomeScreen>
                     Text(
                       '60',
                       style: TextStyle(
-                        color: PitchTheme.primary,
+                        color: PitchTheme.slateHeading,
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.6,
@@ -597,7 +620,7 @@ class _HomeScreenState extends State<HomeScreen>
                     Text(
                       'Score',
                       style: TextStyle(
-                        color: PitchTheme.secondary,
+                        color: PitchTheme.sportsEmerald,
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.4,
@@ -615,26 +638,30 @@ class _HomeScreenState extends State<HomeScreen>
             child: Container(
               height: 38,
               decoration: BoxDecoration(
-                color: PitchTheme.surfaceContainerLow,
+                color: const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: PitchTheme.hairlineBorder,
+                  width: 0.8,
+                ),
               ),
               child: TextField(
                 controller: _searchController,
                 style: const TextStyle(
-                  color: PitchTheme.onSurface,
+                  color: PitchTheme.slateHeading,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
                 decoration: InputDecoration(
-                  hintText: 'Search matches, teams, players, tournaments...',
+                  hintText: 'Search matches, teams, tournaments...',
                   hintStyle: const TextStyle(
-                    color: PitchTheme.outline,
+                    color: PitchTheme.slateSubdued,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
                   prefixIcon: const Icon(
                     Icons.search,
-                    color: PitchTheme.outline,
+                    color: PitchTheme.slateSubdued,
                     size: 19,
                   ),
                   prefixIconConstraints: const BoxConstraints(
@@ -653,13 +680,13 @@ class _HomeScreenState extends State<HomeScreen>
                                   height: 14,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: PitchTheme.primary,
+                                    color: PitchTheme.sportsEmerald,
                                   ),
                                 ),
                               ),
                             IconButton(
                               icon: const Icon(Icons.close, size: 16),
-                              color: PitchTheme.outline,
+                              color: PitchTheme.slateSubdued,
                               onPressed: () => _searchController.clear(),
                             ),
                           ],
@@ -694,13 +721,17 @@ class _HomeScreenState extends State<HomeScreen>
                 Container(
                   width: 38,
                   height: 38,
-                  decoration: const BoxDecoration(
-                    color: PitchTheme.surfaceContainerLow,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: PitchTheme.hairlineBorder,
+                      width: 0.8,
+                    ),
                   ),
                   child: const Icon(
                     Icons.notifications_none_rounded,
-                    color: PitchTheme.onSurfaceVariant,
+                    color: PitchTheme.slateHeading,
                     size: 20,
                   ),
                 ),
@@ -711,10 +742,10 @@ class _HomeScreenState extends State<HomeScreen>
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: PitchTheme.error,
+                      color: PitchTheme.liveRed,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: PitchTheme.surfaceContainerLowest,
+                        color: Colors.white,
                         width: 1.5,
                       ),
                     ),
@@ -734,9 +765,9 @@ class _HomeScreenState extends State<HomeScreen>
               height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: PitchTheme.primaryContainer,
+                color: PitchTheme.sportsEmeraldLight,
                 border: Border.all(
-                  color: PitchTheme.outlineVariant,
+                  color: PitchTheme.sportsEmerald.withValues(alpha: 0.3),
                   width: 1.5,
                 ),
               ),
@@ -744,9 +775,9 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Text(
                   userInitial,
                   style: const TextStyle(
-                    color: PitchTheme.tertiaryFixed,
+                    color: PitchTheme.sportsEmerald,
                     fontSize: 15,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
@@ -1189,8 +1220,8 @@ class _HomeScreenState extends State<HomeScreen>
         child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
         leading: CircleAvatar(
-          backgroundColor: PitchTheme.primaryContainer,
-          foregroundColor: PitchTheme.tertiaryFixed,
+          backgroundColor: PitchTheme.sportsEmeraldLight,
+          foregroundColor: PitchTheme.sportsEmerald,
           radius: 18,
           child: Text(
             p.name.isEmpty ? '?' : p.name[0].toUpperCase(),
@@ -1426,13 +1457,19 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 decoration: BoxDecoration(
                   color: isActive
-                      ? PitchTheme.primaryContainer
-                      : PitchTheme.surfaceContainerLowest,
+                      ? PitchTheme.sportsEmerald
+                      : PitchTheme.cardBg,
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isActive
+                        ? PitchTheme.sportsEmerald
+                        : PitchTheme.hairlineBorder,
+                    width: 0.9,
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 4,
+                      color: Colors.black.withValues(alpha: isActive ? 0.08 : 0.02),
+                      blurRadius: isActive ? 6 : 2,
                       offset: const Offset(0, 1),
                     ),
                   ],
@@ -1448,8 +1485,10 @@ class _HomeScreenState extends State<HomeScreen>
                             width: 7,
                             height: 7,
                             decoration: BoxDecoration(
-                              color: PitchTheme.error
-                                  .withValues(alpha: _pulseAnimation.value),
+                              color: isActive
+                                  ? Colors.white
+                                  : PitchTheme.liveRed
+                                      .withValues(alpha: _pulseAnimation.value),
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -1461,11 +1500,11 @@ class _HomeScreenState extends State<HomeScreen>
                       item['label'] as String,
                       style: TextStyle(
                         color: isActive
-                            ? PitchTheme.tertiaryFixed
-                            : PitchTheme.onSurfaceVariant,
-                        fontSize: 11,
+                            ? Colors.white
+                            : PitchTheme.slateHeading,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ],
@@ -1502,11 +1541,11 @@ class _HomeScreenState extends State<HomeScreen>
                     child: AnimatedBuilder(
                       animation: _pulseAnimation,
                       builder: (context, _) => Container(
-                        width: 9,
-                        height: 9,
+                        width: 8,
+                        height: 8,
                         margin: const EdgeInsets.only(right: 8),
                         decoration: BoxDecoration(
-                          color: PitchTheme.error
+                          color: PitchTheme.liveRed
                               .withValues(alpha: _pulseAnimation.value),
                           shape: BoxShape.circle,
                         ),
@@ -1519,7 +1558,7 @@ class _HomeScreenState extends State<HomeScreen>
                     child: Icon(
                       Icons.sports_cricket,
                       size: 15,
-                      color: PitchTheme.primary,
+                      color: PitchTheme.sportsEmerald,
                     ),
                   ),
                 Text(
@@ -1531,8 +1570,8 @@ class _HomeScreenState extends State<HomeScreen>
                               ? 'CLUB & TEAM MATCHES'
                               : 'LIVE & RECENT MATCHES',
                   style: const TextStyle(
-                    color: PitchTheme.onSurface,
-                    fontSize: 14,
+                    color: PitchTheme.slateHeading,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.5,
                   ),
@@ -1563,7 +1602,7 @@ class _HomeScreenState extends State<HomeScreen>
                     Text(
                       'VIEW ALL',
                       style: TextStyle(
-                        color: PitchTheme.secondary,
+                        color: PitchTheme.sportsEmerald,
                         fontSize: 11.5,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.5,
@@ -1573,7 +1612,7 @@ class _HomeScreenState extends State<HomeScreen>
                     Icon(
                       Icons.arrow_forward,
                       size: 14,
-                      color: PitchTheme.secondary,
+                      color: PitchTheme.sportsEmerald,
                     ),
                   ],
                 ),
@@ -1725,10 +1764,11 @@ class _HomeScreenState extends State<HomeScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: PitchTheme.surfaceContainerLowest,
+        color: PitchTheme.cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: PitchTheme.outlineVariant.withValues(alpha: 0.45),
+          color: PitchTheme.hairlineBorder,
+          width: 0.9,
         ),
         boxShadow: PitchTheme.cardShadow,
       ),
@@ -1737,7 +1777,7 @@ class _HomeScreenState extends State<HomeScreen>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: PitchTheme.surfaceContainerLow,
+              color: const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(12),
             ),
             child: _loadingFeed
@@ -1746,14 +1786,14 @@ class _HomeScreenState extends State<HomeScreen>
                     height: 22,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.2,
-                      color: PitchTheme.primary,
+                      color: PitchTheme.sportsEmerald,
                     ),
                   )
                 : Icon(
                     _feedOffline
                         ? Icons.cloud_off_outlined
                         : Icons.sports_cricket_outlined,
-                    color: PitchTheme.primary,
+                    color: PitchTheme.sportsEmerald,
                     size: 24,
                   ),
           ),
@@ -1765,7 +1805,7 @@ class _HomeScreenState extends State<HomeScreen>
                 Text(
                   emptyTitle,
                   style: const TextStyle(
-                    color: PitchTheme.onSurface,
+                    color: PitchTheme.slateHeading,
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1776,7 +1816,7 @@ class _HomeScreenState extends State<HomeScreen>
                 Text(
                   emptySubtitle,
                   style: const TextStyle(
-                    color: PitchTheme.onSurfaceVariant,
+                    color: PitchTheme.slateSubdued,
                     fontSize: 12,
                   ),
                   maxLines: 2,
@@ -1791,7 +1831,7 @@ class _HomeScreenState extends State<HomeScreen>
             child: const Text(
               'Refresh',
               style: TextStyle(
-                color: PitchTheme.secondary,
+                color: PitchTheme.sportsEmerald,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -2107,6 +2147,41 @@ class _HomeScreenState extends State<HomeScreen>
         !AuthService().isRestrictedGuest &&
         freshM.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode);
 
+    // Compute team logos and codes from local store
+    final tA = store.teamById(teamAId);
+    final tB = store.teamById(teamBId);
+    final logoA = tA?.logo ?? '';
+    final logoB = tB?.logo ?? '';
+    final codeA = tA?.displayCode ?? (tAName.length >= 2 ? tAName.substring(0, 2).toUpperCase() : tAName.toUpperCase());
+    final codeB = tB?.displayCode ?? (tBName.length >= 2 ? tBName.substring(0, 2).toUpperCase() : tBName.toUpperCase());
+
+    // Compute RRR if second innings running
+    double rrr = 0.0;
+    if (freshM != null && freshM.innings.length > 1 && activeTarget > 0) {
+      final lastInn = freshM.innings.last;
+      final runsNeeded = activeTarget - lastInn.totalRuns;
+      final ballsLeft = (oversLimit * ballsPerOver) - lastInn.legalBalls;
+      if (ballsLeft > 0 && runsNeeded > 0) {
+        rrr = (runsNeeded * ballsPerOver) / ballsLeft;
+      }
+    }
+
+    // Parse teamARuns/Overs for display
+    String? aRuns;
+    String? aOvers;
+    String? bRuns;
+    String? bOvers;
+    if (teamAScore != null) {
+      final m = RegExp(r'(\d+/\d+)\s*\(([^)]+)\)').firstMatch(teamAScore);
+      if (m != null) { aRuns = m.group(1); aOvers = '(${m.group(2)})'; }
+      else { aRuns = teamAScore; }
+    }
+    if (teamBScore != null) {
+      final m = RegExp(r'(\d+/\d+)\s*\(([^)]+)\)').firstMatch(teamBScore);
+      if (m != null) { bRuns = m.group(1); bOvers = '(${m.group(2)})'; }
+      else { bRuns = teamBScore; }
+    }
+
     return _UnifiedMatchCardItem(
       id: id,
       tournamentId: tournamentId,
@@ -2122,12 +2197,21 @@ class _HomeScreenState extends State<HomeScreen>
       teamBId: teamBId,
       teamAName: tAName,
       teamBName: tBName,
+      teamALogo: logoA,
+      teamBLogo: logoB,
+      teamACode: codeA,
+      teamBCode: codeB,
+      teamARuns: aRuns,
+      teamAOvers: aOvers,
+      teamBRuns: bRuns,
+      teamBOvers: bOvers,
       teamAScore: teamAScore,
       teamBScore: teamBScore,
       isTeamABatting: isTeamABatting,
       isTeamBBatting: isTeamBBatting,
       activeOversText: activeOversText,
       activeCrr: activeCrr,
+      activeRrr: rrr,
       activeTarget: activeTarget,
       canScore: canScore,
       localMatch: freshM,
@@ -2138,11 +2222,28 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildUnifiedMatchCard(_UnifiedMatchCardItem item, double cardWidth) {
     final isOpening = _openingRemoteId == item.id;
 
-    final footerText = item.isLive
-        ? (item.activeTarget > 0
-            ? 'Target ${item.activeTarget} • CRR ${item.activeCrr.toStringAsFixed(2)}'
-            : 'CRR ${item.activeCrr.toStringAsFixed(2)} • ${item.creatorName.isNotEmpty ? "By ${item.creatorName}" : "Live Feed"}')
-        : (item.resultText.isNotEmpty ? item.resultText : 'Match Concluded');
+    // Build equation text for footer
+    String footerText;
+    if (item.isLive) {
+      if (item.activeTarget > 0) {
+        final runsNeeded = item.activeTarget - (int.tryParse(item.teamBRuns?.split('/').first ?? '0') ?? 0);
+        final battingTeam = item.isTeamBBatting ? item.teamBName : item.teamAName;
+        footerText = '$battingTeam need $runsNeeded runs'
+            '${item.activeRrr > 0 ? ' • RRR ${item.activeRrr.toStringAsFixed(2)}' : ''}';
+      } else {
+        footerText = 'CRR ${item.activeCrr.toStringAsFixed(2)} • ${item.oversLimit} Overs';
+      }
+    } else {
+      footerText = item.resultText.isNotEmpty ? item.resultText : 'Match Concluded';
+    }
+
+    // Tournament/series label
+    String? tournamentLabel;
+    if (item.tournamentId != null) {
+      final t = store.tournamentById(item.tournamentId!);
+      if (t != null && t.name.isNotEmpty) tournamentLabel = t.name;
+    }
+    tournamentLabel ??= item.matchTitle.isNotEmpty ? item.matchTitle : null;
 
     return InkWell(
       onTap: () {
@@ -2158,262 +2259,284 @@ class _HomeScreenState extends State<HomeScreen>
       borderRadius: BorderRadius.circular(16),
       child: SizedBox(
         width: cardWidth,
-        height: 175,
         child: Container(
           decoration: BoxDecoration(
-            color: PitchTheme.surfaceContainerLowest,
+            color: PitchTheme.cardBg,
             borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: PitchTheme.hairlineBorder, width: 0.9),
             boxShadow: PitchTheme.cardShadow,
           ),
-          child: Stack(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                child: Container(
-                  width: 5,
-                  decoration: BoxDecoration(
-                    color: item.isLive ? PitchTheme.secondary : PitchTheme.primary,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      bottomLeft: Radius.circular(16),
+              // ── Header: tournament label + status ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        tournamentLabel ?? (item.oversLimit > 0 ? '${item.oversLimit} Overs Match' : 'Match'),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: PitchTheme.slateSubdued,
+                          letterSpacing: 0.1,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 6),
+                    if (isOpening)
+                      const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: PitchTheme.sportsEmerald),
+                      ),
+                  ],
                 ),
               ),
+
+              // ── 3-column showdown body ──
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8.0,
-                              vertical: 3.0,
-                            ),
+                    // LEFT: Team A
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              PresetTeamLogoBadge(
+                                logoKey: item.teamALogo,
+                                teamName: item.teamAName,
+                                size: 36,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.teamACode,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: item.isTeamABatting ? FontWeight.w900 : FontWeight.w700,
+                                        color: PitchTheme.slateHeading,
+                                      ),
+                                    ),
+                                    if (item.teamARuns != null) ...[
+                                      Text(
+                                        item.teamARuns!,
+                                        style: TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w900,
+                                          color: item.isTeamABatting
+                                              ? PitchTheme.sportsEmerald
+                                              : PitchTheme.slateHeading,
+                                        ),
+                                      ),
+                                      if (item.teamAOvers != null)
+                                        Text(
+                                          item.teamAOvers!,
+                                          style: const TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: PitchTheme.slateSubdued,
+                                          ),
+                                        ),
+                                    ] else
+                                      const Text(
+                                        'Yet to bat',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: PitchTheme.slateSubdued,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // CENTER: Status badge
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: item.isLive
-                                  ? PitchTheme.primaryContainer
-                                  : PitchTheme.surfaceContainer,
-                              borderRadius: BorderRadius.circular(20),
+                              color: const Color(0xFFF1F5F9),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: PitchTheme.hairlineBorder, width: 0.9),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (item.isLive) ...[
+                            child: const Icon(
+                              Icons.sports_cricket,
+                              size: 18,
+                              color: PitchTheme.sportsEmerald,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          if (item.isLive)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: PitchTheme.liveRedBg,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: PitchTheme.liveRed.withValues(alpha: 0.3),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
                                   RepaintBoundary(
                                     child: AnimatedBuilder(
                                       animation: _pulseAnimation,
                                       builder: (context, _) => Container(
-                                        width: 6,
-                                        height: 6,
+                                        width: 5,
+                                        height: 5,
                                         decoration: BoxDecoration(
-                                          color: PitchTheme.error.withValues(
-                                              alpha: _pulseAnimation.value),
+                                          color: PitchTheme.liveRed.withValues(alpha: _pulseAnimation.value),
                                           shape: BoxShape.circle,
                                         ),
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 5),
-                                ],
-                                Flexible(
-                                  child: Text(
-                                    item.isLive
-                                        ? 'LIVE • ${item.oversLimit} Ov'
-                                        : 'RESULT • ${item.oversLimit} Ov',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    'LIVE',
                                     style: TextStyle(
-                                      color: item.isLive
-                                          ? PitchTheme.tertiaryFixed
-                                          : PitchTheme.onSurfaceVariant,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: PitchTheme.liveRed,
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        if (isOpening)
-                          const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: PitchTheme.primary,
-                            ),
-                          )
-                        else
-                          Text(
-                            item.isLive
-                                ? 'Over ${item.activeOversText}'
-                                : (item.venue.isNotEmpty ? item.venue : 'Match'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: PitchTheme.outline,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                      ],
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
+                                ],
+                              ),
+                            )
+                          else
                             Container(
-                              width: 10,
-                              height: 10,
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                               decoration: BoxDecoration(
-                                color: item.isTeamABatting
-                                    ? PitchTheme.secondary
-                                    : PitchTheme.outlineVariant,
-                                shape: BoxShape.circle,
+                                color: PitchTheme.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(20),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                item.teamAName,
+                              child: const Text(
+                                'FT',
                                 style: TextStyle(
-                                  color: PitchTheme.onSurface,
-                                  fontSize: 14,
-                                  fontWeight: item.isTeamABatting
-                                      ? FontWeight.w900
-                                      : FontWeight.w700,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: PitchTheme.slateSubdued,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              item.teamAScore ?? 'Yet to bat',
-                              style: TextStyle(
-                                color: item.teamAScore != null
-                                    ? PitchTheme.onSurface
-                                    : PitchTheme.outline,
-                                fontSize: item.teamAScore != null ? 13.5 : 11,
-                                fontWeight: item.teamAScore != null
-                                    ? FontWeight.w900
-                                    : FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color: item.isTeamBBatting
-                                    ? PitchTheme.secondary
-                                    : PitchTheme.outlineVariant,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                item.teamBName,
-                                style: TextStyle(
-                                  color: PitchTheme.onSurface,
-                                  fontSize: 13.5,
-                                  fontWeight: item.isTeamBBatting
-                                      ? FontWeight.w900
-                                      : FontWeight.w700,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              item.teamBScore ?? 'Yet to bat',
-                              style: TextStyle(
-                                color: item.teamBScore != null
-                                    ? PitchTheme.onSurface
-                                    : PitchTheme.outline,
-                                fontSize: item.teamBScore != null ? 13.5 : 11,
-                                fontWeight: item.teamBScore != null
-                                    ? FontWeight.w900
-                                    : FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    Container(
-                      height: 34,
-                      padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                      decoration: BoxDecoration(
-                        color: item.isLive
-                            ? PitchTheme.surfaceContainerLow
-                            : PitchTheme.secondaryContainer
-                                .withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(8),
+                        ],
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    ),
+
+                    // RIGHT: Team B
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                if (!item.isLive) ...[
-                                  const Icon(
-                                    Icons.emoji_events,
-                                    size: 14,
-                                    color: PitchTheme.onSecondaryContainer,
-                                  ),
-                                  const SizedBox(width: 5),
-                                ],
-                                Expanded(
-                                  child: Text(
-                                    footerText,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: item.isLive
-                                          ? PitchTheme.primary
-                                          : PitchTheme.onSecondaryContainer,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      item.teamBCode,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: item.isTeamBBatting ? FontWeight.w900 : FontWeight.w700,
+                                        color: PitchTheme.slateHeading,
+                                      ),
                                     ),
-                                  ),
+                                    if (item.teamBRuns != null) ...[
+                                      Text(
+                                        item.teamBRuns!,
+                                        style: TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w900,
+                                          color: item.isTeamBBatting
+                                              ? PitchTheme.sportsEmerald
+                                              : PitchTheme.slateHeading,
+                                        ),
+                                        textAlign: TextAlign.end,
+                                      ),
+                                      if (item.teamBOvers != null)
+                                        Text(
+                                          item.teamBOvers!,
+                                          style: const TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: PitchTheme.slateSubdued,
+                                          ),
+                                          textAlign: TextAlign.end,
+                                        ),
+                                    ] else
+                                      const Text(
+                                        'Yet to bat',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: PitchTheme.slateSubdued,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        textAlign: TextAlign.end,
+                                      ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            item.canScore && item.isLive
-                                ? 'Scoring in progress'
-                                : (item.isLive ? 'Match Centre →' : 'Scorecard →'),
-                            style: const TextStyle(
-                              color: PitchTheme.secondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                            ),
+                              ),
+                              const SizedBox(width: 8),
+                              PresetTeamLogoBadge(
+                                logoKey: item.teamBLogo,
+                                teamName: item.teamBName,
+                                size: 36,
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
                   ],
+                ),
+              ),
+
+              // ── Footer: equation / result ──
+              Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: PitchTheme.hairlineBorder, width: 0.9)),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Text(
+                  footerText,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: item.isLive ? PitchTheme.slateHeading : PitchTheme.slateSubdued,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
               ),
             ],
@@ -2456,8 +2579,12 @@ class _HomeScreenState extends State<HomeScreen>
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: PitchTheme.surfaceContainerLowest,
+          color: PitchTheme.cardBg,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: PitchTheme.hairlineBorder,
+            width: 0.9,
+          ),
           boxShadow: PitchTheme.cardShadow,
         ),
         child: Column(
@@ -2473,10 +2600,10 @@ class _HomeScreenState extends State<HomeScreen>
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: PitchTheme.primaryContainer,
+                        color: PitchTheme.sportsEmeraldLight,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: PitchTheme.outlineVariant,
+                          color: PitchTheme.sportsEmerald.withValues(alpha: 0.3),
                           width: 1.5,
                         ),
                       ),
@@ -2484,7 +2611,7 @@ class _HomeScreenState extends State<HomeScreen>
                         child: Text(
                           userInitial,
                           style: const TextStyle(
-                            color: PitchTheme.tertiaryFixed,
+                            color: PitchTheme.sportsEmerald,
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                           ),
@@ -2498,7 +2625,7 @@ class _HomeScreenState extends State<HomeScreen>
                         width: 18,
                         height: 18,
                         decoration: const BoxDecoration(
-                          color: PitchTheme.secondary,
+                          color: PitchTheme.sportsEmerald,
                           shape: BoxShape.circle,
                         ),
                         child: const Center(
@@ -2525,7 +2652,7 @@ class _HomeScreenState extends State<HomeScreen>
                             child: Text(
                               userName,
                               style: const TextStyle(
-                                color: PitchTheme.onSurface,
+                                color: PitchTheme.slateHeading,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -2540,14 +2667,14 @@ class _HomeScreenState extends State<HomeScreen>
                               vertical: 1.5,
                             ),
                             decoration: BoxDecoration(
-                              color: PitchTheme.primaryContainer,
+                              color: PitchTheme.sportsEmeraldLight,
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
                               'PRO',
                               style: TextStyle(
-                                color: PitchTheme.tertiaryFixed,
-                                fontSize: 9,
+                                color: PitchTheme.sportsEmerald,
+                                fontSize: 9.5,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
@@ -2656,206 +2783,110 @@ class _HomeScreenState extends State<HomeScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Text(
-              'QUICK ACTIONS',
-              style: TextStyle(
-                color: PitchTheme.onSurface,
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.5,
-              ),
-            ),
-            Text(
-              'FAST START',
-              style: TextStyle(
-                color: PitchTheme.outline,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.8,
-              ),
-            ),
-          ],
+        const Text(
+          'QUICK ACTIONS',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+            color: PitchTheme.slateSubdued,
+            letterSpacing: 0.8,
+          ),
         ),
         const SizedBox(height: 10),
-
-        // 2-Column Responsive Grid with zero hardcoded width
         Row(
           children: [
-            // Create Match Button
             Expanded(
-              child: InkWell(
-                onTap: () async {
-                  if (await requireSignedInAction(context, store,
-                      actionLabel: 'create matches and score live')) {
-                    _push(MatchSetupScreen(store: store));
-                  }
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: PitchTheme.primary,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: PitchTheme.cardShadow,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: const BoxDecoration(
-                              color: PitchTheme.primaryContainer,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.sports_cricket,
-                                color: PitchTheme.tertiaryFixed,
-                                size: 19,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: PitchTheme.tertiaryFixed,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              '+ NEW',
-                              style: TextStyle(
-                                color: PitchTheme.primaryContainer,
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Create Match',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 3),
-                      const Text(
-                        'Single game or friendly live scoring',
-                        style: TextStyle(
-                          color: PitchTheme.onPrimaryContainer,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          height: 1.2,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
+              child: _buildActionTile(
+                icon: Icons.sports_cricket,
+                label: 'Create Match',
+                sublabel: 'Start scoring now',
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF047857), Color(0xFF064E3B)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                onTap: () => _push(MatchSetupScreen(store: store)),
               ),
             ),
-            const SizedBox(width: 10),
-
-            // New Tourney Button
+            const SizedBox(width: 12),
             Expanded(
-              child: InkWell(
-                onTap: () => _push(TournamentsScreen(store: store)),
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: PitchTheme.secondary,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: PitchTheme.cardShadow,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: const BoxDecoration(
-                              color: PitchTheme.primaryContainer,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.emoji_events,
-                                color: Colors.white,
-                                size: 19,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: PitchTheme.secondaryContainer,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'LEAGUE',
-                              style: TextStyle(
-                                color: PitchTheme.onSecondaryContainer,
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'New Tournament',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 3),
-                      const Text(
-                        'Knockout, groups & brackets',
-                        style: TextStyle(
-                          color: PitchTheme.secondaryContainer,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          height: 1.2,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
+              child: _buildActionTile(
+                icon: Icons.emoji_events_rounded,
+                label: 'Tournament',
+                sublabel: 'Manage fixtures',
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFD97706), Color(0xFF78350F)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                onTap: () => widget.onSelectTab(2),
               ),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildActionTile({
+    required IconData icon,
+    required String label,
+    required String sublabel,
+    required Gradient gradient,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: Colors.white, size: 22),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              sublabel,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.white.withValues(alpha: 0.75),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -2953,8 +2984,12 @@ class _HomeScreenState extends State<HomeScreen>
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: PitchTheme.surfaceContainerLowest,
+            color: PitchTheme.cardBg,
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: PitchTheme.hairlineBorder,
+              width: 0.9,
+            ),
             boxShadow: PitchTheme.cardShadow,
           ),
           child: Row(
@@ -2964,13 +2999,13 @@ class _HomeScreenState extends State<HomeScreen>
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: PitchTheme.tertiaryFixed,
+                  color: const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Center(
                   child: Icon(
-                    Icons.emoji_events,
-                    color: PitchTheme.primaryContainer,
+                    Icons.emoji_events_outlined,
+                    color: Color(0xFFD97706),
                     size: 22,
                   ),
                 ),
@@ -2987,7 +3022,7 @@ class _HomeScreenState extends State<HomeScreen>
                           child: Text(
                             t.name,
                             style: const TextStyle(
-                              color: PitchTheme.onSurface,
+                              color: PitchTheme.slateHeading,
                               fontSize: 14.5,
                               fontWeight: FontWeight.w800,
                             ),
@@ -3001,15 +3036,15 @@ class _HomeScreenState extends State<HomeScreen>
                             vertical: 1.5,
                           ),
                           decoration: BoxDecoration(
-                            color: PitchTheme.primaryContainer,
+                            color: PitchTheme.sportsEmeraldLight,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             '${t.oversLimit}O',
                             style: const TextStyle(
-                              color: PitchTheme.tertiaryFixed,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
+                              color: PitchTheme.sportsEmerald,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
                         ),
@@ -3150,149 +3185,5 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // 7. SECTION 5: DIRECTORIES (Manage & Connect)
-  // ---------------------------------------------------------------------------
-  Widget _buildDirectoriesSection() {
-    final uid = store.effectiveUserId;
-    final tourneyCount = store.tournaments.where((t) {
-      if (t.creatorId.isEmpty) return true;
-      return uid.isNotEmpty && t.creatorId == uid;
-    }).length;
-    final topTeam =
-        store.teams.isNotEmpty ? store.teams.first.name : 'Islamabad E.';
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Text(
-              'DIRECTORIES',
-              style: TextStyle(
-                color: PitchTheme.onSurface,
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.5,
-              ),
-            ),
-            Text(
-              'Manage & Connect',
-              style: TextStyle(
-                color: PitchTheme.outline,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-
-        // 3-Column Responsive Row
-        Row(
-          children: [
-            // 1. My Tournament
-            Expanded(
-              child: _buildDirectoryCard(
-                icon: Icons.emoji_events,
-                iconBg: PitchTheme.secondaryContainer.withValues(alpha: 0.5),
-                iconColor: PitchTheme.secondary,
-                title: 'My Tournament',
-                subtitle: '$tourneyCount Active',
-                onTap: () => _push(TournamentsScreen(store: store)),
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // 2. My Team
-            Expanded(
-              child: _buildDirectoryCard(
-                icon: Icons.shield_outlined,
-                iconBg: PitchTheme.primaryContainer,
-                iconColor: PitchTheme.tertiaryFixed,
-                title: 'My Team',
-                subtitle: topTeam,
-                onTap: () => _push(TeamsScreen(store: store)),
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // 3. Player Profile
-            Expanded(
-              child: _buildDirectoryCard(
-                icon: Icons.person_rounded,
-                iconBg: PitchTheme.primaryContainer,
-                iconColor: PitchTheme.tertiaryFixed,
-                title: 'Player Profile',
-                subtitle: store.activeProfile.displayName,
-                onTap: () => _push(ProfileScreen(store: store)),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDirectoryCard({
-    required IconData icon,
-    required Color iconBg,
-    required Color iconColor,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
-        decoration: BoxDecoration(
-          color: PitchTheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: PitchTheme.cardShadow,
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: iconBg,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                color: PitchTheme.onSurface,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                color: PitchTheme.outline,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

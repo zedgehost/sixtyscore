@@ -86,12 +86,33 @@ class Team {
   String id;
   String name;
   List<Player> players;
+  String logo; // preset identifier e.g. 'preset:tigers' or base64 or URL
+  String shortCode; // 2-4 letter abbreviation e.g. 'NEP', 'PNG', 'LQ'
 
   /// Deterministic shareable team code (e.g. "TM-K7QX2M").
   String get teamCode => teamCodeForId(id);
 
-  Team({required this.id, required this.name, List<Player>? players})
-    : players = players ?? [];
+  /// 2-4 letter display abbreviation
+  String get displayCode {
+    if (shortCode.trim().isNotEmpty) return shortCode.trim().toUpperCase();
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return 'TM';
+    return trimmed.length <= 3
+        ? trimmed.toUpperCase()
+        : trimmed.substring(0, 2).toUpperCase();
+  }
+
+  Team({
+    required this.id,
+    required this.name,
+    List<Player>? players,
+    this.logo = '',
+    this.shortCode = '',
+  }) : players = players ?? [];
 
   Player? playerById(String pid) {
     for (final p in players) {
@@ -103,12 +124,16 @@ class Team {
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
+    'logo': logo,
+    'shortCode': shortCode,
     'players': players.map((p) => p.toJson()).toList(),
   };
 
   factory Team.fromJson(Map<String, dynamic> j) => Team(
     id: j['id'] as String,
     name: j['name'] as String,
+    logo: j['logo'] as String? ?? '',
+    shortCode: j['shortCode'] as String? ?? '',
     players: ((j['players'] as List?) ?? [])
         .map((e) => Player.fromJson(e as Map<String, dynamic>))
         .toList(),

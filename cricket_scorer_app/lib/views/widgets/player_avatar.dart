@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
+import 'package:cricket_scorer_app/core/constants/preset_player_avatars.dart';
 
 /// Returns the Material icon best representing a player role.
 IconData roleIcon(String role) {
@@ -72,6 +73,42 @@ class PlayerAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (photoBase64 != null && photoBase64!.startsWith('preset:')) {
+      final preset = PlayerPresetCatalog.findById(photoBase64!);
+      if (preset != null) {
+        return Container(
+          width: radius * 2,
+          height: radius * 2,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [preset.primaryColor, preset.secondaryColor],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.35),
+              width: 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: preset.secondaryColor.withValues(alpha: 0.3),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Icon(
+              preset.icon,
+              size: radius * 1.05,
+              color: preset.iconColor,
+            ),
+          ),
+        );
+      }
+    }
+
     if (photoBase64 != null && photoBase64!.isNotEmpty) {
       try {
         final Uint8List bytes = base64Decode(photoBase64!);

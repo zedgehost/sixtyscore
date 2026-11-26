@@ -45,6 +45,17 @@ class PitchTheme {
   static const Color error = Color(0xFFBA1A1A); // Cricket Red Live Indicator
   static const Color errorContainer = Color(0xFFFFDAD6);
 
+  // Modern Clean Sports Palette (Cricbuzz / CREX / International standard)
+  static const Color sportsEmerald = Color(0xFF047857); // Deep athletic turf green
+  static const Color sportsEmeraldDark = Color(0xFF064E3B);
+  static const Color sportsEmeraldLight = Color(0xFFECFDF5);
+  static const Color liveRed = Color(0xFFDC2626); // Crisp international LIVE red
+  static const Color liveRedBg = Color(0xFFFEE2E2); // Soft red badge background
+  static const Color hairlineBorder = Color(0xFFE2E8F0); // 0.8px subtle card border
+  static const Color slateHeading = Color(0xFF0F172A); // Sharp dark athletic text
+  static const Color slateSubdued = Color(0xFF64748B); // Muted secondary text
+  static const Color cardBg = Color(0xFFFFFFFF); // Pure white card surface
+
   // Card Box Shadow
   static List<BoxShadow> get cardShadow => [
         BoxShadow(

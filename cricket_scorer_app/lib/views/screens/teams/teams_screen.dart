@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -17,6 +17,8 @@ import 'package:cricket_scorer_app/core/theme/theme.dart';
 import 'package:cricket_scorer_app/views/screens/teams/profile_screen.dart';
 import 'package:cricket_scorer_app/views/widgets/guest_guard.dart';
 import 'package:cricket_scorer_app/views/widgets/player_avatar.dart';
+import 'package:cricket_scorer_app/core/constants/preset_team_logos.dart';
+import 'package:cricket_scorer_app/views/widgets/preset_pickers.dart';
 
 class TeamsScreen extends StatefulWidget {
   final Store store;
@@ -93,13 +95,10 @@ class _TeamsScreenState extends State<TeamsScreen> {
           final t = store.teams[i];
           final stats = _computeTeamMetricsFor(t);
           return ListTile(
-            leading: CircleAvatar(
-              backgroundColor: PitchTheme.primary,
-              foregroundColor: Colors.white,
-              child: Text(
-                t.name.isEmpty ? '?' : t.name[0].toUpperCase(),
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
+            leading: PresetTeamLogoBadge(
+              logoKey: t.logo,
+              teamName: t.name,
+              size: 40,
             ),
             title: Row(
               children: [
@@ -131,7 +130,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
               ],
             ),
             subtitle: Text(
-              '${t.players.length} players · ${stats['played'] ?? 0} matches (${stats['won'] ?? 0}W - ${stats['lost'] ?? 0}L)',
+              '${t.players.length} players Â· ${stats['played'] ?? 0} matches (${stats['won'] ?? 0}W - ${stats['lost'] ?? 0}L)',
               style: const TextStyle(fontSize: 12, color: PitchTheme.onSurfaceVariant),
             ),
             trailing: Row(
@@ -188,7 +187,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
                 builder: (_) => TeamDetailScreen(store: store, team: t),
               ),
             ).then((_) async {
-              // M1: only the team changed → teams-only save. A failed
+              // M1: only the team changed â†’ teams-only save. A failed
               // save is shown, not swallowed into a debug print.
               final saved = await store.persistTeamsOnly();
               if (!saved && context.mounted) {
@@ -211,40 +210,127 @@ class _TeamsScreenState extends State<TeamsScreen> {
       return;
     }
     if (!context.mounted) return;
-    final ctrl = TextEditingController(text: existing?.name ?? '');
-    final name = await showDialog<String>(
+    final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    final codeCtrl = TextEditingController(text: existing?.shortCode ?? '');
+    var selectedLogo = existing?.logo ?? '';
+
+    final ok = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        title: Text(existing == null ? 'New team' : 'Edit team'),
-        content: TextField(
-          controller: ctrl,
-          decoration: const InputDecoration(labelText: 'Team name'),
+      builder: (c) => StatefulBuilder(
+        builder: (c, setD) => AlertDialog(
+          title: Text(existing == null ? 'New Team' : 'Edit Team'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  onTap: () async {
+                    final picked = await showTeamLogoPicker(
+                      context,
+                      currentLogoId: selectedLogo,
+                    );
+                    if (picked != null) {
+                      setD(() {
+                        selectedLogo = picked.id;
+                        if (codeCtrl.text.trim().isEmpty) {
+                          codeCtrl.text = picked.defaultCode;
+                        }
+                      });
+                    }
+                  },
+                  child: Column(
+                    children: [
+                      PresetTeamLogoBadge(
+                        logoKey: selectedLogo,
+                        teamName: nameCtrl.text.isNotEmpty ? nameCtrl.text : 'Team',
+                        size: 56,
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: PitchTheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: PitchTheme.hairlineBorder),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.shield_outlined, size: 14, color: PitchTheme.sportsEmerald),
+                            SizedBox(width: 4),
+                            Text(
+                              'Choose Emblem',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: PitchTheme.sportsEmerald,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Team Name',
+                    hintText: 'e.g. Lahore Qalandars',
+                  ),
+                  onChanged: (_) => setD(() {}),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: codeCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  maxLength: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Short Code (Abbreviation)',
+                    hintText: 'e.g. LQ, NEP, PNG',
+                    counterText: '',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(c, ctrl.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
-    if (name != null && name.isNotEmpty) {
+
+    if (ok == true && nameCtrl.text.trim().isNotEmpty) {
+      final name = nameCtrl.text.trim();
+      final code = codeCtrl.text.trim().toUpperCase();
       if (existing == null) {
-        await store.upsertTeam(Team(id: Store.newId('team'), name: name));
+        await store.upsertTeam(Team(
+          id: Store.newId('team'),
+          name: name,
+          logo: selectedLogo,
+          shortCode: code,
+        ));
       } else {
         existing.name = name;
+        existing.logo = selectedLogo;
+        existing.shortCode = code;
         await store.persistTeamsOnly();
-      unawaited(() async {
-        try {
-          final client = CpanelApiClient();
-          await client.init();
-          CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
-        } catch (_) {}
-      }());
+        unawaited(() async {
+          try {
+            final client = CpanelApiClient();
+            await client.init();
+            CpanelSyncService(store: store, apiClient: client).triggerAutoSync();
+          } catch (_) {}
+        }());
       }
     }
   }
@@ -614,7 +700,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                     if (p.isCaptain) 'C',
                     if (p.isViceCaptain) 'VC',
                     if (p.isKeeper) 'WK',
-                  ].join(' · ');
+                  ].join(' Â· ');
                   final cardPhoto = store.photoForPlayer(p.id);
 
                   return Material(
@@ -669,7 +755,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                         ],
                       ),
                       subtitle: Text(
-                        '${p.role} · ${p.battingStyle} · ${p.bowlingStyle}${tags.isEmpty ? '' : ' · $tags'}',
+                        '${p.role} Â· ${p.battingStyle} Â· ${p.bowlingStyle}${tags.isEmpty ? '' : ' Â· $tags'}',
                         style: const TextStyle(fontSize: 12, color: PitchTheme.onSurfaceVariant),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -770,7 +856,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     );
   }
 
-  /// v1.1.7: Add-player chooser — create a new player or pick an existing
+  /// v1.1.7: Add-player chooser â€” create a new player or pick an existing
   /// registered player into this team.
   void _chooseAddPlayer(BuildContext context) {
     showDialog(
@@ -868,7 +954,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                                 ),
                                 title: Text(r.name),
                                 subtitle: Text(
-                                  '${r.role}${r.jerseyNo > 0 ? ' · #${r.jerseyNo}' : ''}',
+                                  '${r.role}${r.jerseyNo > 0 ? ' Â· #${r.jerseyNo}' : ''}',
                                 ),
                                 trailing: already
                                     ? const Icon(Icons.check,
@@ -931,7 +1017,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     var cap = p.isCaptain;
     var vc = p.isViceCaptain;
     var wk = p.isKeeper;
-    // v1.1.6: photo management through Team Management — Add / Change /
+    // v1.1.6: photo management through Team Management â€” Add / Change /
     // Remove Image, saved on the shared player record (see save below).
     var photoBase64 = p.photoBase64;
     const roles = ['Batter', 'Bowler', 'All-Rounder', 'Wicket-Keeper'];
@@ -1003,13 +1089,32 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                TextButton.icon(
-                  onPressed: photoBase64.isEmpty
-                      ? null
-                      : () => setD(() => photoBase64 = ''),
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  label: const Text('Remove Image'),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () async {
+                        final avatar = await showPlayerAvatarPicker(
+                          context,
+                          currentAvatarId: photoBase64,
+                        );
+                        if (avatar != null) {
+                          setD(() => photoBase64 = avatar.id);
+                        }
+                      },
+                      icon: const Icon(Icons.face, size: 18),
+                      label: const Text('Preset Avatar'),
+                    ),
+                    if (photoBase64.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      TextButton.icon(
+                        onPressed: () => setD(() => photoBase64 = ''),
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('Remove'),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 4),
                 TextField(
@@ -1082,7 +1187,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
       p.role = role;
       p.battingStyle = bat;
       p.bowlingStyle = bowl;
-      // v1.1.6: photo lives on the shared player record — when this team
+      // v1.1.6: photo lives on the shared player record â€” when this team
       // player links to a registered player (same ID), update the
       // canonical record too so every screen shows the same photo.
       p.photoBase64 = photoBase64;
