@@ -21,6 +21,7 @@ import 'package:cricket_scorer_app/domain/scoring/scoring.dart';
 import 'package:cricket_scorer_app/services/sync/sync_service.dart';
 import 'package:cricket_scorer_app/domain/tournament/tournament_engine.dart';
 import 'package:cricket_scorer_app/services/auth/auth_service.dart';
+import 'package:cricket_scorer_app/services/api/cpanel_api_client.dart';
 
 /// One soft-deleted record kept in Trash (Feature 1 — Trash +
 /// Restore). [payload] is the entity's full `toJson()` map captured
@@ -1701,6 +1702,21 @@ class Store extends ChangeNotifier implements PlayoffStore {
       teams.add(team);
     }
     await persist();
+    if (!isRemotePreview && !AuthService().isRestrictedGuest) {
+      unawaited(() async {
+        try {
+          final client = CpanelApiClient();
+          await client.init();
+          if (client.token != null && client.token!.isNotEmpty) {
+            await client.createTeam({
+              ...team.toJson(),
+              'short_name': team.displayCode,
+              'logo_base64': team.logo,
+            });
+          }
+        } catch (_) {}
+      }());
+    }
   }
 
   Future<void> deleteTeam(String id) async {

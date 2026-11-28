@@ -188,6 +188,10 @@ class CpanelApiClient {
     return _get('/teams/${Uri.encodeComponent(teamId)}');
   }
 
+  Future<Map<String, dynamic>> createTeam(Map<String, dynamic> teamData) async {
+    return _post('/teams', teamData);
+  }
+
   // ---------------- MATCHES ----------------
 
   Future<Map<String, dynamic>> getMatchesFeed({int limit = 15}) async {
