@@ -97,8 +97,10 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
     _lastEventsCounts[match.id] = eventsCount;
     _lastEpochs[match.id] = nowEpoch;
 
-    final teamAName = _store!.teamName(match.teamAId);
-    final teamBName = _store!.teamName(match.teamBId);
+    final teamA = _store!.teamById(match.teamAId);
+    final teamB = _store!.teamById(match.teamBId);
+    final teamAName = teamA?.name ?? _store!.teamName(match.teamAId);
+    final teamBName = teamB?.name ?? _store!.teamName(match.teamBId);
 
     final payloadMap = <String, dynamic>{
       'id': match.id,
@@ -121,10 +123,18 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
       'revision': revision,
       'events_count': eventsCount,
       'updated_at_epoch': nowEpoch,
+      'teams': [
+        if (teamA != null) teamA.toJson(),
+        if (teamB != null) teamB.toJson(),
+      ],
       'payload': {
         ...match.toJson(),
         'teamAName': teamAName,
         'teamBName': teamBName,
+        'teamALogo': teamA?.logo ?? '',
+        'teamBLogo': teamB?.logo ?? '',
+        'teamACode': teamA?.shortCode ?? '',
+        'teamBCode': teamB?.shortCode ?? '',
         'revision': revision,
         'eventsCount': eventsCount,
         'updatedAtEpoch': nowEpoch,
