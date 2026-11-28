@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:cricket_scorer_app/models/models.dart';
 import 'package:cricket_scorer_app/services/auth/user_code.dart';
@@ -602,55 +603,153 @@ class _MatchLineupsScreenState extends State<MatchLineupsScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // Dialog: Search Player by ID / Database
+  // Dialog: Search Player by ID / Database (Recently Used + Live API Search)
   // ---------------------------------------------------------------------------
-  void _showSearchPlayerDialog(Team team, bool isTeamA) {
+  Future<void> _showSearchPlayerDialog(Team team, bool isTeamA) async {
+    const recentPrefKey = 'score60_recent_player_ids_v1';
     final searchCtrl = TextEditingController();
-    final List<Player> pool = [];
+
+    // 1. Collect recently used player IDs (SharedPreferences + recent matches)
+    final recentOrder = <String>[];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getStringList(recentPrefKey) ?? const [];
+      for (final id in saved) {
+        if (id.isNotEmpty && !recentOrder.contains(id)) recentOrder.add(id);
+      }
+    } catch (_) {}
+
+    for (final m in store.matches.reversed.take(15)) {
+      for (final id in [
+        ...m.xiA,
+        ...m.xiB,
+        if (m.innings.isNotEmpty) ...m.innings.last.batting.keys,
+        if (m.innings.isNotEmpty) ...m.innings.last.bowling.keys,
+      ]) {
+        if (id.isNotEmpty && !recentOrder.contains(id)) recentOrder.add(id);
+      }
+    }
+    final recentSet = recentOrder.toSet();
+
+    // 2. Build local pool excluding players already in this team
+    final List<Player> rawPool = [];
     for (final t in store.teams) {
       for (final p in t.players) {
         if (!team.players.any((tp) => tp.id == p.id) &&
-            !pool.any((x) => x.id == p.id)) {
-          pool.add(p);
+            !rawPool.any((x) => x.id == p.id)) {
+          rawPool.add(p);
         }
       }
     }
     for (final r in store.regPlayers) {
       if (!team.players.any((tp) => tp.id == r.id) &&
-          !pool.any((x) => x.id == r.id)) {
-        pool.add(r.toTeamPlayer());
+          !rawPool.any((x) => x.id == r.id)) {
+        rawPool.add(r.toTeamPlayer());
       }
     }
 
-    List<Player> filtered = List.from(pool);
+    // Sort pool: recently used players first (in recency order), then others
+    final pool = <Player>[
+      for (final rid in recentOrder)
+        ...rawPool.where((p) => p.id == rid),
+      ...rawPool.where((p) => !recentSet.contains(p.id)),
+    ];
 
-    showDialog(
+    List<Player> filtered = List.from(pool);
+    final Set<String> remoteIds = {};
+    bool isSearchingRemote = false;
+    Timer? debounce;
+    int searchToken = 0;
+
+    if (!mounted) return;
+    await showDialog(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setDState) {
+            Future<void> runRemoteSearch(String rawQuery, int token) async {
+              final q = rawQuery.trim();
+              if (q.length < 2) {
+                if (ctx.mounted) {
+                  setDState(() => isSearchingRemote = false);
+                }
+                return;
+              }
+              try {
+                final client = CpanelApiClient();
+                await client.init();
+                final res = await client.searchPlayers(q);
+                if (!ctx.mounted || token != searchToken) return;
+
+                final remoteList = <Player>[];
+                if (res['status'] == 'success' && res['data'] is List) {
+                  for (final item in (res['data'] as List)) {
+                    if (item is! Map) continue;
+                    final m = Map<String, dynamic>.from(item);
+                    final pid = (m['id'] ?? '').toString();
+                    final pname = (m['name'] ?? '').toString().trim();
+                    if (pid.isEmpty || pname.isEmpty) continue;
+                    if (team.players.any((tp) => tp.id == pid)) continue;
+                    if (filtered.any((fp) => fp.id == pid)) continue;
+
+                    remoteIds.add(pid);
+                    remoteList.add(Player(
+                      id: pid,
+                      name: pname,
+                      role: (m['role'] ?? 'Batter').toString(),
+                      userCode: (m['user_code'] ?? '').toString(),
+                      city: (m['city'] ?? '').toString(),
+                      isVerified: m['is_verified'] == true || m['is_verified'] == 1,
+                    ));
+                  }
+                }
+                setDState(() {
+                  isSearchingRemote = false;
+                  filtered = [...filtered, ...remoteList];
+                });
+              } catch (_) {
+                if (ctx.mounted && token == searchToken) {
+                  setDState(() => isSearchingRemote = false);
+                }
+              }
+            }
+
             return AlertDialog(
-              backgroundColor: PitchTheme.surfaceContainerLowest,
+              backgroundColor: PitchTheme.cardBg,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
               title: const Text(
                 'Search Player Database',
                 style: TextStyle(
-                  color: PitchTheme.onSurface,
+                  color: PitchTheme.slateHeading,
                   fontSize: 17,
                   fontWeight: FontWeight.w900,
                 ),
               ),
               content: SizedBox(
                 width: double.maxFinite,
-                height: (MediaQuery.sizeOf(context).height * 0.45).clamp(240.0, 420.0),
+                height: (MediaQuery.sizeOf(context).height * 0.48).clamp(260.0, 440.0),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     TextField(
                       controller: searchCtrl,
                       decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: isSearchingRemote
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: PitchTheme.sportsEmerald,
+                                  ),
+                                ),
+                              )
+                            : null,
                         hintText: 'Search by name or code...',
                         filled: true,
                         fillColor: PitchTheme.surfaceContainerLow,
@@ -660,11 +759,15 @@ class _MatchLineupsScreenState extends State<MatchLineupsScreen> {
                         ),
                       ),
                       onChanged: (val) {
+                        debounce?.cancel();
+                        final token = ++searchToken;
+                        final query = val.toLowerCase().trim();
+                        final cleanQuery = query.replaceAll('-', '').replaceAll(' ', '');
+
                         setDState(() {
-                          final query = val.toLowerCase().trim();
-                          final cleanQuery = query.replaceAll('-', '').replaceAll(' ', '');
                           if (query.isEmpty) {
                             filtered = List.from(pool);
+                            isSearchingRemote = false;
                           } else {
                             filtered = pool.where((p) {
                               final name = p.name.toLowerCase();
@@ -677,26 +780,52 @@ class _MatchLineupsScreenState extends State<MatchLineupsScreen> {
                                   cleanCode.contains(cleanQuery) ||
                                   (p.jerseyNo > 0 && '${p.jerseyNo}' == query);
                             }).toList();
+                            isSearchingRemote = query.length >= 2;
                           }
                         });
+
+                        if (query.length >= 2) {
+                          debounce = Timer(const Duration(milliseconds: 350), () {
+                            runRemoteSearch(val, token);
+                          });
+                        }
                       },
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
+                    if (searchCtrl.text.trim().isEmpty && recentSet.isNotEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          'RECENTLY USED & LOCAL PLAYERS',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: PitchTheme.slateSubdued,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
                     Expanded(
                       child: filtered.isEmpty
-                          ? const Center(
+                          ? Center(
                               child: Text(
-                                'No matching players found in database.',
-                                style: TextStyle(
-                                  color: PitchTheme.outline,
+                                isSearchingRemote
+                                    ? 'Searching live player database...'
+                                    : 'No matching players found.',
+                                style: const TextStyle(
+                                  color: PitchTheme.slateSubdued,
                                   fontSize: 13,
                                 ),
                               ),
                             )
                           : ListView.builder(
+                              physics: const BouncingScrollPhysics(),
                               itemCount: filtered.length,
                               itemBuilder: (context, idx) {
                                 final p = filtered[idx];
+                                final isRecent = recentSet.contains(p.id);
+                                final isGlobal = remoteIds.contains(p.id);
+                                final code = p.userCode ?? '';
                                 return ListTile(
                                   contentPadding: EdgeInsets.zero,
                                   leading: CircleAvatar(
@@ -705,32 +834,88 @@ class _MatchLineupsScreenState extends State<MatchLineupsScreen> {
                                     child: Text(
                                       _getInitials(p.name),
                                       style: const TextStyle(
-                                        color: PitchTheme.onSurface,
+                                        color: PitchTheme.slateHeading,
                                         fontWeight: FontWeight.w800,
                                         fontSize: 12,
                                       ),
                                     ),
                                   ),
-                                  title: Text(
-                                    p.name,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 14,
-                                    ),
+                                  title: Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          p.name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 14,
+                                            color: PitchTheme.slateHeading,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (isGlobal) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: PitchTheme.sportsEmeraldLight,
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: const Text(
+                                            'LIVE',
+                                            style: TextStyle(
+                                              fontSize: 8.5,
+                                              fontWeight: FontWeight.w900,
+                                              color: PitchTheme.sportsEmerald,
+                                            ),
+                                          ),
+                                        ),
+                                      ] else if (isRecent) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: PitchTheme.surfaceContainerLow,
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: const Text(
+                                            'RECENT',
+                                            style: TextStyle(
+                                              fontSize: 8.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: PitchTheme.slateSubdued,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                   subtitle: Text(
-                                    '${p.role} • ${p.battingStyle}',
+                                    '${p.role} • ${p.battingStyle}${code.isNotEmpty ? ' • $code' : ''}',
                                     style: const TextStyle(
-                                      color: PitchTheme.outline,
+                                      color: PitchTheme.slateSubdued,
                                       fontSize: 12,
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   trailing: IconButton(
                                     icon: const Icon(
                                       Icons.add_circle,
-                                      color: PitchTheme.secondary,
+                                      color: PitchTheme.sportsEmerald,
                                     ),
                                     onPressed: () async {
+                                      // Record as recently used
+                                      try {
+                                        final prefs = await SharedPreferences.getInstance();
+                                        final updated = [
+                                          p.id,
+                                          ...recentOrder.where((id) => id != p.id),
+                                        ].take(30).toList();
+                                        await prefs.setStringList(recentPrefKey, updated);
+                                      } catch (_) {}
+
                                       team.players.add(p);
                                       await store.upsertTeam(team);
 
