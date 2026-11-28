@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:cricket_scorer_app/models/models.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/core/theme/theme.dart';
-import 'package:cricket_scorer_app/views/widgets/player_avatar.dart';
+import 'package:cricket_scorer_app/views/widgets/broadcast_match_card.dart';
 import 'package:cricket_scorer_app/views/screens/scorecard/scorecard_screen.dart';
 
 class CompletedMatchesScreen extends StatefulWidget {
@@ -105,67 +105,73 @@ class _CompletedMatchesScreenState extends State<CompletedMatchesScreen> {
   }
 
   Widget _card(Match m) {
-    final a = store.teamName(m.teamAId);
-    final b = store.teamName(m.teamBId);
-    return ScoreCard(
-      padding: const EdgeInsets.all(12),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ScorecardScreen(store: store, match: m),
+    final tA = store.teamById(m.teamAId);
+    final tB = store.teamById(m.teamBId);
+    final a = tA?.name ?? store.teamName(m.teamAId);
+    final b = tB?.name ?? store.teamName(m.teamBId);
+    final codeA = tA?.displayCode ??
+        (a.length >= 2 ? a.substring(0, 2).toUpperCase() : a.toUpperCase());
+    final codeB = tB?.displayCode ??
+        (b.length >= 2 ? b.substring(0, 2).toUpperCase() : b.toUpperCase());
+
+    String? aRuns;
+    String? aOvers;
+    String? bRuns;
+    String? bOvers;
+    final bpo = m.ballsPerOver > 0 ? m.ballsPerOver : 6;
+    for (final inn in m.innings) {
+      final runs = '${inn.totalRuns}/${inn.wickets}';
+      final ov = '(${inn.legalBalls ~/ bpo}.${inn.legalBalls % bpo})';
+      if (inn.battingTeamId == m.teamAId) {
+        aRuns = runs;
+        aOvers = ov;
+      } else {
+        bRuns = runs;
+        bOvers = ov;
+      }
+    }
+
+    String header = m.matchTitle.isNotEmpty
+        ? m.matchTitle
+        : (m.dateIso.isNotEmpty
+            ? m.dateIso.split('T').first
+            : '${m.oversLimit} Overs Match');
+    if (m.tournamentId != null) {
+      final t = store.tournamentById(m.tournamentId!);
+      if (t != null && t.name.isNotEmpty) header = t.name;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: BroadcastMatchCard(
+        headerTitle: header,
+        teamAName: a,
+        teamACode: codeA,
+        teamALogo: tA?.logo ?? '',
+        teamARuns: aRuns,
+        teamAOvers: aOvers,
+        teamBName: b,
+        teamBCode: codeB,
+        teamBLogo: tB?.logo ?? '',
+        teamBRuns: bRuns,
+        teamBOvers: bOvers,
+        isLive: false,
+        statusLabel: m.status == 'noResult' ? 'N/R' : 'FT',
+        footerText: m.resultText.isNotEmpty ? m.resultText : 'Match Concluded',
+        headerTrailing: IconButton(
+          icon: const Icon(Icons.delete_outline, size: 18),
+          color: PitchTheme.slateSubdued,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          tooltip: 'Delete match',
+          onPressed: () => _confirmDelete(m),
         ),
-      ),
-      child: Row(
-        children: [
-          CaptainAvatar(store: store, teamId: m.teamAId, radius: 18),
-          const SizedBox(width: 4),
-          CaptainAvatar(store: store, teamId: m.teamBId, radius: 18),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$a vs $b',
-                  style: const TextStyle(
-                    color: PitchTheme.onSurface,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                for (final inn in m.innings.take(2))
-                  Text(
-                    '${store.teamName(inn.battingTeamId)} '
-                    '${inn.totalRuns}/${inn.wickets} '
-                    '(${inn.legalBalls ~/ inn.ballsPerOver}.${inn.legalBalls % inn.ballsPerOver} ov)',
-                    style: const TextStyle(color: PitchTheme.outline, fontSize: 12),
-                  ),
-                if (m.resultText.isNotEmpty)
-                  Text(
-                    m.resultText,
-                    style: const TextStyle(
-                      color: kCyan,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                if (m.dateIso.isNotEmpty)
-                  Text(
-                    m.dateIso.split('T').first,
-                    style: const TextStyle(color: PitchTheme.outline, fontSize: 11),
-                  ),
-              ],
-            ),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ScorecardScreen(store: store, match: m),
           ),
-          StatusPill(m.status),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, size: 20),
-            color: PitchTheme.outline,
-            tooltip: 'Delete match',
-            onPressed: () => _confirmDelete(m),
-          ),
-        ],
+        ),
       ),
     );
   }

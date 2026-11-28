@@ -11,6 +11,7 @@ import 'package:cricket_scorer_app/services/auth/auth_service.dart';
 import 'package:cricket_scorer_app/services/storage/store.dart';
 import 'package:cricket_scorer_app/views/screens/scorecard/scorecard_screen.dart';
 import 'package:cricket_scorer_app/views/screens/scoring/scoring_screen.dart';
+import 'package:cricket_scorer_app/views/widgets/broadcast_match_card.dart';
 
 class PublicMatchesScreen extends StatefulWidget {
   final Store store;
@@ -668,497 +669,169 @@ class _PublicMatchesScreenState extends State<PublicMatchesScreen>
   }
 
   Widget _buildLocalMatchCard(Match m) {
-    final teamAName = store.teamName(m.teamAId);
-    final teamBName = store.teamName(m.teamBId);
+    final tA = store.teamById(m.teamAId);
+    final tB = store.teamById(m.teamBId);
+    final teamAName = tA?.name ?? store.teamName(m.teamAId);
+    final teamBName = tB?.name ?? store.teamName(m.teamBId);
+    final teamACode = tA?.displayCode ??
+        (teamAName.length >= 2
+            ? teamAName.substring(0, 2).toUpperCase()
+            : teamAName.toUpperCase());
+    final teamBCode = tB?.displayCode ??
+        (teamBName.length >= 2
+            ? teamBName.substring(0, 2).toUpperCase()
+            : teamBName.toUpperCase());
     final isLive = m.status == 'live';
 
-    String scoreA = 'Yet to bat';
-    String scoreB = 'Yet to bat';
-    if (m.innings.isNotEmpty) {
-      final inn1 = m.innings[0];
-      final s = '${inn1.totalRuns}/${inn1.wickets} (${inn1.legalBalls ~/ 6}.${inn1.legalBalls % 6})';
-      if (inn1.battingTeamId == m.teamAId) {
-        scoreA = s;
+    String? aRuns;
+    String? aOvers;
+    String? bRuns;
+    String? bOvers;
+    final bpo = m.ballsPerOver > 0 ? m.ballsPerOver : 6;
+    for (final inn in m.innings) {
+      final runs = '${inn.totalRuns}/${inn.wickets}';
+      final ov = '(${inn.legalBalls ~/ bpo}.${inn.legalBalls % bpo})';
+      if (inn.battingTeamId == m.teamAId) {
+        aRuns = runs;
+        aOvers = ov;
       } else {
-        scoreB = s;
-      }
-    }
-    if (m.innings.length > 1) {
-      final inn2 = m.innings[1];
-      final s = '${inn2.totalRuns}/${inn2.wickets} (${inn2.legalBalls ~/ 6}.${inn2.legalBalls % 6})';
-      if (inn2.battingTeamId == m.teamAId) {
-        scoreA = s;
-      } else {
-        scoreB = s;
+        bRuns = runs;
+        bOvers = ov;
       }
     }
 
-    final isCreator = !AuthService().isRestrictedGuest &&
-        m.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode);
+    final activeBattingId =
+        m.innings.isNotEmpty ? m.innings.last.battingTeamId : '';
+    final isTeamABatting = isLive && activeBattingId == m.teamAId;
+    final isTeamBBatting = isLive && activeBattingId == m.teamBId;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: PitchTheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isLive
-              ? PitchTheme.secondary.withValues(alpha: 0.4)
-              : PitchTheme.outlineVariant.withValues(alpha: 0.4),
-        ),
-        boxShadow: PitchTheme.cardShadow,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => _openMatch(m),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header: Status Badge, Title & Creator indicator
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isLive) ...[
-                          AnimatedBuilder(
-                            animation: _pulseAnimation,
-                            builder: (context, _) => Container(
-                              width: 7,
-                              height: 7,
-                              decoration: BoxDecoration(
-                                color: PitchTheme.error.withValues(alpha: _pulseAnimation.value),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                            decoration: BoxDecoration(
-                              color: PitchTheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              'LIVE • ${m.oversLimit} Ov',
-                              style: const TextStyle(
-                                color: PitchTheme.tertiaryFixed,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ] else ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                            decoration: BoxDecoration(
-                              color: PitchTheme.surfaceContainer,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              'RESULT • ${m.oversLimit} Ov',
-                              style: const TextStyle(
-                                color: PitchTheme.onSurfaceVariant,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (isCreator) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: PitchTheme.secondaryContainer.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              'My Match',
-                              style: TextStyle(
-                                color: PitchTheme.onSecondaryContainer,
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    Flexible(
-                      child: Text(
-                        m.venue.isNotEmpty ? m.venue : (m.matchTitle.isNotEmpty ? m.matchTitle : 'Match'),
-                        style: const TextStyle(
-                          color: PitchTheme.outline,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+    String? headerTitle;
+    if (m.tournamentId != null) {
+      final t = store.tournamentById(m.tournamentId!);
+      if (t != null && t.name.isNotEmpty) headerTitle = t.name;
+    }
+    headerTitle ??= m.matchTitle.isNotEmpty
+        ? m.matchTitle
+        : (m.venue.isNotEmpty ? m.venue : '${m.oversLimit} Overs Match');
 
-                // Team A Row
-                _buildTeamRow(
-                  name: teamAName,
-                  scoreText: scoreA,
-                  isLive: isLive && m.innings.isNotEmpty && m.innings.last.battingTeamId == m.teamAId,
-                ),
-                const SizedBox(height: 8),
+    String footerText;
+    if (isLive) {
+      if (m.innings.length > 1 && m.innings[1].target > 0) {
+        final inn2 = m.innings[1];
+        final runsNeeded = inn2.target - inn2.totalRuns;
+        final ballsLeft = (m.oversLimit * bpo) - inn2.legalBalls;
+        final rrr = (ballsLeft > 0 && runsNeeded > 0)
+            ? (runsNeeded * bpo) / ballsLeft
+            : 0.0;
+        final battingName =
+            inn2.battingTeamId == m.teamAId ? teamAName : teamBName;
+        footerText = '$battingName need $runsNeeded runs'
+            '${rrr > 0 ? ' • RRR ${rrr.toStringAsFixed(2)}' : ''}';
+      } else if (m.innings.isNotEmpty) {
+        final inn = m.innings.last;
+        final crr = inn.legalBalls > 0
+            ? (inn.totalRuns * bpo) / inn.legalBalls
+            : 0.0;
+        footerText = 'CRR ${crr.toStringAsFixed(2)} • ${m.oversLimit} Overs';
+      } else {
+        footerText = '${m.oversLimit} Overs Match';
+      }
+    } else {
+      footerText =
+          m.resultText.isNotEmpty ? m.resultText : 'Match Concluded';
+    }
 
-                // Team B Row
-                _buildTeamRow(
-                  name: teamBName,
-                  scoreText: scoreB,
-                  isLive: isLive && m.innings.isNotEmpty && m.innings.last.battingTeamId == m.teamBId,
-                ),
-                const SizedBox(height: 10),
-
-                // Footer Divider
-                Divider(
-                  height: 1,
-                  thickness: 0.8,
-                  color: PitchTheme.surfaceContainerLow,
-                ),
-                const SizedBox(height: 8),
-
-                // Footer Row: Match result or CRR info & Action hint
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        m.resultText.isNotEmpty
-                            ? m.resultText
-                            : (isLive
-                                ? (m.innings.length > 1
-                                    ? 'Target: ${m.innings[1].target} · 2nd Innings'
-                                    : '1st Innings in progress')
-                                : 'Match Concluded'),
-                        style: TextStyle(
-                          color: m.resultText.isNotEmpty
-                              ? PitchTheme.secondary
-                              : (isLive ? PitchTheme.primary : PitchTheme.onSurfaceVariant),
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          isCreator && isLive ? 'Score / Manage' : 'View Match',
-                          style: TextStyle(
-                            color: isCreator && isLive ? PitchTheme.secondary : PitchTheme.primary,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(width: 3),
-                        Icon(
-                          Icons.arrow_forward_ios,
-                          size: 11,
-                          color: isCreator && isLive ? PitchTheme.secondary : PitchTheme.primary,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: BroadcastMatchCard(
+        headerTitle: headerTitle,
+        teamAName: teamAName,
+        teamACode: teamACode,
+        teamALogo: tA?.logo ?? '',
+        teamARuns: aRuns,
+        teamAOvers: aOvers,
+        isTeamABatting: isTeamABatting,
+        teamBName: teamBName,
+        teamBCode: teamBCode,
+        teamBLogo: tB?.logo ?? '',
+        teamBRuns: bRuns,
+        teamBOvers: bOvers,
+        isTeamBBatting: isTeamBBatting,
+        isLive: isLive,
+        footerText: footerText,
+        pulseAnimation: _pulseAnimation,
+        onTap: () => _openMatch(m),
       ),
     );
   }
 
   Widget _buildRemoteMatchCard(RemoteMatchSummary rm) {
+    final tA = store.teamById(rm.teamAId);
+    final tB = store.teamById(rm.teamBId);
+    final logoA = (tA != null && tA.logo.isNotEmpty) ? tA.logo : rm.teamALogo;
+    final logoB = (tB != null && tB.logo.isNotEmpty) ? tB.logo : rm.teamBLogo;
+    final codeA = (tA != null && tA.shortCode.isNotEmpty)
+        ? tA.shortCode
+        : (rm.teamACode.isNotEmpty
+            ? rm.teamACode
+            : (rm.teamAName.length >= 2
+                ? rm.teamAName.substring(0, 2).toUpperCase()
+                : rm.teamAName.toUpperCase()));
+    final codeB = (tB != null && tB.shortCode.isNotEmpty)
+        ? tB.shortCode
+        : (rm.teamBCode.isNotEmpty
+            ? rm.teamBCode
+            : (rm.teamBName.length >= 2
+                ? rm.teamBName.substring(0, 2).toUpperCase()
+                : rm.teamBName.toUpperCase()));
+
     final innA = rm.inningsForTeam(rm.teamAId) ??
         (rm.innings.isNotEmpty ? rm.innings.first : null);
     final innB = rm.inningsForTeam(rm.teamBId) ??
         (rm.innings.length > 1 ? rm.innings[1] : null);
 
-    final scoreA = innA != null
-        ? '${innA.totalRuns}/${innA.wickets} (${innA.oversText})'
-        : 'Yet to bat';
-    final scoreB = innB != null
-        ? '${innB.totalRuns}/${innB.wickets} (${innB.oversText})'
-        : 'Yet to bat';
+    final aRuns = innA != null ? '${innA.totalRuns}/${innA.wickets}' : null;
+    final aOvers = innA != null ? '(${innA.oversText})' : null;
+    final bRuns = innB != null ? '${innB.totalRuns}/${innB.wickets}' : null;
+    final bOvers = innB != null ? '(${innB.oversText})' : null;
 
     final activeInn = rm.innings.isNotEmpty ? rm.innings.last : null;
     final isOpening = _openingMatchId == rm.id;
+
+    final headerTitle = rm.matchTitle.isNotEmpty
+        ? rm.matchTitle
+        : (rm.venue.isNotEmpty ? rm.venue : '${rm.oversLimit} Overs Match');
 
     final footerText = rm.isLive
         ? (activeInn != null && activeInn.target > 0
             ? 'Target ${activeInn.target} • CRR ${activeInn.crr.toStringAsFixed(2)}'
             : (activeInn != null
-                ? 'CRR ${activeInn.crr.toStringAsFixed(2)}'
-                : 'Live on 60Score'))
+                ? 'CRR ${activeInn.crr.toStringAsFixed(2)} • ${rm.oversLimit} Overs'
+                : 'Live on STUMPS'))
         : (rm.resultText.isNotEmpty ? rm.resultText : 'Match Concluded');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: PitchTheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: rm.isLive
-              ? PitchTheme.secondary.withValues(alpha: 0.3)
-              : PitchTheme.outlineVariant.withValues(alpha: 0.4),
-        ),
-        boxShadow: PitchTheme.cardShadow,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: BroadcastMatchCard(
+        headerTitle: headerTitle,
+        teamAName: rm.teamAName,
+        teamACode: codeA,
+        teamALogo: logoA,
+        teamARuns: aRuns,
+        teamAOvers: aOvers,
+        isTeamABatting: rm.isLive && activeInn?.battingTeamId == rm.teamAId,
+        teamBName: rm.teamBName,
+        teamBCode: codeB,
+        teamBLogo: logoB,
+        teamBRuns: bRuns,
+        teamBOvers: bOvers,
+        isTeamBBatting: rm.isLive && activeInn?.battingTeamId == rm.teamBId,
+        isLive: rm.isLive,
+        footerText: footerText,
+        pulseAnimation: _pulseAnimation,
+        isOpening: isOpening,
+        onTap: () => _openMatch(rm),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => _openMatch(rm),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header: Status Badge, Title & Creator indicator
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (rm.isLive) ...[
-                          AnimatedBuilder(
-                            animation: _pulseAnimation,
-                            builder: (context, _) => Container(
-                              width: 7,
-                              height: 7,
-                              decoration: BoxDecoration(
-                                color: PitchTheme.error.withValues(alpha: _pulseAnimation.value),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                            decoration: BoxDecoration(
-                              color: PitchTheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              'LIVE • ${rm.oversLimit} Ov',
-                              style: const TextStyle(
-                                color: PitchTheme.tertiaryFixed,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ] else ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                            decoration: BoxDecoration(
-                              color: PitchTheme.surfaceContainer,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              'RESULT • ${rm.oversLimit} Ov',
-                              style: const TextStyle(
-                                color: PitchTheme.onSurfaceVariant,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (rm.creatorName.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: PitchTheme.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'By ${rm.creatorName}',
-                              style: const TextStyle(
-                                color: PitchTheme.outline,
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (isOpening)
-                      const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: PitchTheme.secondary,
-                        ),
-                      )
-                    else
-                      Flexible(
-                        child: Text(
-                          rm.venue.isNotEmpty
-                              ? rm.venue
-                              : (rm.matchTitle.isNotEmpty ? rm.matchTitle : 'Public Match'),
-                          style: const TextStyle(
-                            color: PitchTheme.outline,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Team A Row
-                _buildTeamRow(
-                  name: rm.teamAName,
-                  scoreText: scoreA,
-                  isLive: rm.isLive && activeInn?.battingTeamId == rm.teamAId,
-                ),
-                const SizedBox(height: 8),
-
-                // Team B Row
-                _buildTeamRow(
-                  name: rm.teamBName,
-                  scoreText: scoreB,
-                  isLive: rm.isLive && activeInn?.battingTeamId == rm.teamBId,
-                ),
-                const SizedBox(height: 10),
-
-                // Footer Divider
-                Divider(
-                  height: 1,
-                  thickness: 0.8,
-                  color: PitchTheme.surfaceContainerLow,
-                ),
-                const SizedBox(height: 8),
-
-                // Footer Row: Match result / Telemetry & View link
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        footerText,
-                        style: TextStyle(
-                          color: rm.resultText.isNotEmpty
-                              ? PitchTheme.secondary
-                              : (rm.isLive ? PitchTheme.primary : PitchTheme.onSurfaceVariant),
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Spectate',
-                          style: TextStyle(
-                            color: PitchTheme.secondary,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        SizedBox(width: 3),
-                        Icon(
-                          Icons.arrow_forward_ios,
-                          size: 11,
-                          color: PitchTheme.secondary,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTeamRow({
-    required String name,
-    required String scoreText,
-    required bool isLive,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Row(
-            children: [
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: isLive ? PitchTheme.primaryContainer : PitchTheme.surfaceContainerLow,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isLive
-                        ? PitchTheme.secondary.withValues(alpha: 0.5)
-                        : PitchTheme.outlineVariant.withValues(alpha: 0.5),
-                  ),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  name.isNotEmpty ? name[0].toUpperCase() : 'T',
-                  style: TextStyle(
-                    color: isLive ? PitchTheme.tertiaryFixed : PitchTheme.primary,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 11,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  name,
-                  style: TextStyle(
-                    color: PitchTheme.onSurface,
-                    fontWeight: isLive ? FontWeight.w800 : FontWeight.w700,
-                    fontSize: 13.5,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          scoreText,
-          style: TextStyle(
-            color: isLive ? PitchTheme.primary : PitchTheme.onSurface,
-            fontWeight: FontWeight.w800,
-            fontSize: 13.5,
-          ),
-        ),
-      ],
     );
   }
 }

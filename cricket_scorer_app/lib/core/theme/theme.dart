@@ -16,30 +16,30 @@ import 'package:cricket_scorer_app/core/theme/pitch_theme.dart';
 
 // ---------- Color tokens (Pitch Dynamic Modernization) ----------
 const kNavyDeep = PitchTheme.surface; // #F8F9FA
-const kNavy = PitchTheme.surfaceContainerLowest; // #FFFFFF
-const kPanel = PitchTheme.surfaceContainerLowest; // #FFFFFF
+const kNavy = PitchTheme.cardBg; // #FFFFFF
+const kPanel = PitchTheme.cardBg; // #FFFFFF
 const kPanel2 = PitchTheme.surfaceContainerLow; // #F2F4F3
-const kCyan = PitchTheme.secondary; // Emerald Green
-const kTeal = PitchTheme.secondary;
+const kCyan = PitchTheme.sportsEmerald; // Athletic Emerald Green
+const kTeal = PitchTheme.sportsEmerald;
 const kTealDark = PitchTheme.primaryContainer;
 const kGold = PitchTheme.primary;
 const kAmber = Color(0xFFB58500);
-const kSilver = PitchTheme.onSurfaceVariant; // Subdued charcoal
+const kSilver = PitchTheme.slateSubdued; // Muted athletic slate
 const kWhite = Colors.white;
-const kRed = PitchTheme.error;
-const kGreen = PitchTheme.secondary;
+const kRed = PitchTheme.liveRed;
+const kGreen = PitchTheme.sportsEmerald;
 
 // Dual-palette professional system mapped to Pitch Dynamic
-const kSunsetOrange = PitchTheme.secondary;
+const kSunsetOrange = PitchTheme.sportsEmerald;
 const kSunsetOrangeDeep = PitchTheme.primary;
-const kSunsetOrangeSoft = PitchTheme.secondaryContainer;
+const kSunsetOrangeSoft = PitchTheme.sportsEmeraldLight;
 const kSunsetNavy = PitchTheme.surfaceContainerLow;
 const kSunsetNavyDeep = PitchTheme.surface;
 const kOceanBlack = PitchTheme.surface;
-const kOceanDeep = PitchTheme.surfaceContainerLowest;
-const kOceanSteel = PitchTheme.outlineVariant;
-const kOceanMist = PitchTheme.onSurface;
-const kOceanFaint = PitchTheme.outline;
+const kOceanDeep = PitchTheme.cardBg;
+const kOceanSteel = PitchTheme.hairlineBorder;
+const kOceanMist = PitchTheme.slateHeading;
+const kOceanFaint = PitchTheme.slateSubdued;
 
 const kSunsetGradient = LinearGradient(
   colors: [PitchTheme.surfaceContainerLowest, PitchTheme.surfaceContainerLow],
@@ -135,94 +135,139 @@ ThemeData buildScore60Theme() {
     textTheme: textTheme,
     scaffoldBackgroundColor: PitchTheme.surface,
     appBarTheme: const AppBarTheme(
-      backgroundColor: PitchTheme.surfaceContainerLowest,
-      foregroundColor: PitchTheme.onSurface,
+      backgroundColor: PitchTheme.cardBg,
+      foregroundColor: PitchTheme.slateHeading,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
+      scrolledUnderElevation: 0.5,
       centerTitle: false,
-      iconTheme: IconThemeData(color: PitchTheme.onSurface),
-    ),
-    cardTheme: CardThemeData(
-      color: PitchTheme.surfaceContainerLowest,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: PitchTheme.outlineVariant.withValues(alpha: 0.3)),
+      iconTheme: IconThemeData(color: PitchTheme.slateHeading),
+      titleTextStyle: TextStyle(
+        color: PitchTheme.slateHeading,
+        fontSize: 18,
+        fontWeight: FontWeight.w900,
+        letterSpacing: -0.2,
       ),
     ),
-    dialogTheme: const DialogThemeData(
-      backgroundColor: PitchTheme.surfaceContainerLowest,
+    cardTheme: CardThemeData(
+      color: PitchTheme.cardBg,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(PitchTheme.cardRadius),
+        side: const BorderSide(color: PitchTheme.hairlineBorder, width: 0.9),
+      ),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: PitchTheme.cardBg,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(PitchTheme.cardRadius),
+      ),
+      titleTextStyle: const TextStyle(
+        color: PitchTheme.slateHeading,
+        fontSize: 18,
+        fontWeight: FontWeight.w900,
+      ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-      backgroundColor: PitchTheme.surfaceContainerLowest,
-      selectedItemColor: PitchTheme.secondary,
-      unselectedItemColor: PitchTheme.outline,
+      backgroundColor: PitchTheme.cardBg,
+      selectedItemColor: PitchTheme.sportsEmerald,
+      unselectedItemColor: PitchTheme.slateSubdued,
+      type: BottomNavigationBarType.fixed,
+      elevation: 8,
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: PitchTheme.surfaceContainerLowest,
-      indicatorColor: PitchTheme.secondaryContainer.withValues(alpha: 0.4),
+      backgroundColor: PitchTheme.cardBg,
+      indicatorColor: PitchTheme.sportsEmeraldLight,
     ),
     drawerTheme: const DrawerThemeData(
-      backgroundColor: PitchTheme.surfaceContainerLowest,
+      backgroundColor: PitchTheme.cardBg,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: PitchTheme.surfaceContainerLow,
-      hintStyle: const TextStyle(color: PitchTheme.outline),
+      hintStyle: const TextStyle(color: PitchTheme.slateSubdued, fontSize: 13.5),
+      labelStyle: const TextStyle(color: PitchTheme.slateSubdued, fontWeight: FontWeight.w600),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(PitchTheme.inputRadius),
+        borderSide: const BorderSide(color: PitchTheme.hairlineBorder),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: PitchTheme.outlineVariant.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(PitchTheme.inputRadius),
+        borderSide: const BorderSide(color: PitchTheme.hairlineBorder),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: PitchTheme.secondary, width: 1.5),
+        borderRadius: BorderRadius.circular(PitchTheme.inputRadius),
+        borderSide: const BorderSide(color: PitchTheme.sportsEmerald, width: 1.5),
       ),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: PitchTheme.surfaceContainerLow,
-      side: BorderSide(color: PitchTheme.outlineVariant.withValues(alpha: 0.4)),
-      labelStyle: const TextStyle(color: PitchTheme.onSurface),
+      selectedColor: PitchTheme.sportsEmeraldLight,
+      side: const BorderSide(color: PitchTheme.hairlineBorder),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(PitchTheme.chipRadius),
+      ),
+      labelStyle: const TextStyle(
+        color: PitchTheme.slateHeading,
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+      ),
     ),
-    dividerColor: PitchTheme.outlineVariant.withValues(alpha: 0.3),
+    dividerColor: PitchTheme.hairlineBorder,
     snackBarTheme: const SnackBarThemeData(
       backgroundColor: PitchTheme.primaryContainer,
-      contentTextStyle: TextStyle(color: Colors.white),
+      contentTextStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: PitchTheme.secondary,
+      backgroundColor: PitchTheme.sportsEmerald,
       foregroundColor: Colors.white,
     ),
     tabBarTheme: const TabBarThemeData(
-      labelColor: PitchTheme.primary,
-      unselectedLabelColor: PitchTheme.outline,
-      indicatorColor: PitchTheme.primary,
+      labelColor: PitchTheme.sportsEmerald,
+      unselectedLabelColor: PitchTheme.slateSubdued,
+      indicatorColor: PitchTheme.sportsEmerald,
+      labelStyle: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+      unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
     ),
     bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: PitchTheme.surfaceContainerLowest,
+      backgroundColor: PitchTheme.cardBg,
       surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
     ),
     listTileTheme: const ListTileThemeData(
-      textColor: PitchTheme.onSurface,
-      iconColor: PitchTheme.outline,
+      textColor: PitchTheme.slateHeading,
+      iconColor: PitchTheme.slateSubdued,
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: PitchTheme.primary,
+        backgroundColor: PitchTheme.sportsEmerald,
         foregroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(PitchTheme.inputRadius),
+        ),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: PitchTheme.primary,
-        side: const BorderSide(color: PitchTheme.outlineVariant),
+        foregroundColor: PitchTheme.sportsEmerald,
+        side: const BorderSide(color: PitchTheme.hairlineBorder),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(PitchTheme.inputRadius),
+        ),
+        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: PitchTheme.secondary,
+        foregroundColor: PitchTheme.sportsEmerald,
+        textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
     ),
   );
@@ -248,19 +293,9 @@ class ScoreCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final card = Container(
       padding: padding,
-      decoration: BoxDecoration(
-        color: PitchTheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: highlight
-              ? PitchTheme.secondary
-              : PitchTheme.outlineVariant.withValues(alpha: 0.35),
-          width: highlight ? 1.5 : 1,
-        ),
-        boxShadow: PitchTheme.cardShadow,
-      ),
+      decoration: PitchTheme.cardDecoration(isLive: highlight),
       child: DefaultTextStyle.merge(
-        style: const TextStyle(color: PitchTheme.onSurface),
+        style: const TextStyle(color: PitchTheme.slateHeading),
         child: child,
       ),
     );

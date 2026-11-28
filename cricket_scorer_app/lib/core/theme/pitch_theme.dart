@@ -72,4 +72,67 @@ class PitchTheme {
           offset: const Offset(0, 4),
         ),
       ];
+
+  // ── Global Style Control System (Matches HomePage Pitch Dynamic) ──
+  static const double cardRadius = 16.0;
+  static const double inputRadius = 12.0;
+  static const double chipRadius = 20.0;
+
+  static BoxDecoration cardDecoration({
+    bool isLive = false,
+    double radius = cardRadius,
+    Color? color,
+  }) =>
+      BoxDecoration(
+        color: color ?? cardBg,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: isLive
+              ? sportsEmerald.withValues(alpha: 0.45)
+              : hairlineBorder,
+          width: isLive ? 1.2 : 0.9,
+        ),
+        boxShadow: cardShadow,
+      );
+
+  static BoxDecoration subtleSurfaceDecoration({
+    double radius = inputRadius,
+    Color? color,
+  }) =>
+      BoxDecoration(
+        color: color ?? surfaceContainerLow,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: hairlineBorder, width: 0.9),
+      );
+
+  static const TextStyle sectionHeaderStyle = TextStyle(
+    color: slateHeading,
+    fontSize: 13.5,
+    fontWeight: FontWeight.w900,
+    letterSpacing: 0.5,
+  );
+
+  static const TextStyle cardTitleStyle = TextStyle(
+    color: slateHeading,
+    fontSize: 15,
+    fontWeight: FontWeight.w800,
+  );
+
+  static const TextStyle cardSubtitleStyle = TextStyle(
+    color: slateSubdued,
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+  );
+
+  static const TextStyle scoreNumeralStyle = TextStyle(
+    color: slateHeading,
+    fontSize: 17,
+    fontWeight: FontWeight.w900,
+  );
+
+  static const TextStyle badgeTextStyle = TextStyle(
+    fontSize: 10,
+    fontWeight: FontWeight.w900,
+    letterSpacing: 0.4,
+  );
 }

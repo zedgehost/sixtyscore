@@ -29,7 +29,7 @@ import 'package:cricket_scorer_app/views/screens/teams/profile_screen.dart';
 import 'package:cricket_scorer_app/views/screens/teams/teams_screen.dart';
 import 'package:cricket_scorer_app/views/screens/tournament/tournaments_screen.dart';
 import 'package:cricket_scorer_app/views/widgets/app_logo.dart';
-import 'package:cricket_scorer_app/core/constants/preset_team_logos.dart';
+import 'package:cricket_scorer_app/views/widgets/broadcast_match_card.dart';
 import 'package:cricket_scorer_app/services/sync/live_match_telemetry_hub.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -2253,7 +2253,25 @@ class _HomeScreenState extends State<HomeScreen>
     }
     tournamentLabel ??= item.matchTitle.isNotEmpty ? item.matchTitle : null;
 
-    return InkWell(
+    return BroadcastMatchCard(
+      width: cardWidth,
+      headerTitle: tournamentLabel ?? (item.oversLimit > 0 ? '${item.oversLimit} Overs Match' : 'Match'),
+      teamAName: item.teamAName,
+      teamACode: item.teamACode,
+      teamALogo: item.teamALogo,
+      teamARuns: item.teamARuns,
+      teamAOvers: item.teamAOvers,
+      isTeamABatting: item.isTeamABatting,
+      teamBName: item.teamBName,
+      teamBCode: item.teamBCode,
+      teamBLogo: item.teamBLogo,
+      teamBRuns: item.teamBRuns,
+      teamBOvers: item.teamBOvers,
+      isTeamBBatting: item.isTeamBBatting,
+      isLive: item.isLive,
+      footerText: footerText,
+      pulseAnimation: _pulseAnimation,
+      isOpening: isOpening,
       onTap: () {
         if (isOpening) return;
         if (item.canScore && item.isLive && item.localMatch != null) {
@@ -2264,293 +2282,6 @@ class _HomeScreenState extends State<HomeScreen>
           _openRemoteMatch(item.remoteSummary!);
         }
       },
-      borderRadius: BorderRadius.circular(16),
-      child: SizedBox(
-        width: cardWidth,
-        child: Container(
-          decoration: BoxDecoration(
-            color: PitchTheme.cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: PitchTheme.hairlineBorder, width: 0.9),
-            boxShadow: PitchTheme.cardShadow,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ── Header: tournament label + status ──
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        tournamentLabel ?? (item.oversLimit > 0 ? '${item.oversLimit} Overs Match' : 'Match'),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: PitchTheme.slateSubdued,
-                          letterSpacing: 0.1,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    if (isOpening)
-                      const SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: PitchTheme.sportsEmerald),
-                      ),
-                  ],
-                ),
-              ),
-
-              // ── 3-column showdown body ──
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // LEFT: Team A
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              PresetTeamLogoBadge(
-                                logoKey: item.teamALogo,
-                                teamName: item.teamAName,
-                                size: 36,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.teamACode,
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: item.isTeamABatting ? FontWeight.w900 : FontWeight.w700,
-                                        color: PitchTheme.slateHeading,
-                                      ),
-                                    ),
-                                    if (item.teamARuns != null) ...[
-                                      Text(
-                                        item.teamARuns!,
-                                        style: TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w900,
-                                          color: item.isTeamABatting
-                                              ? PitchTheme.sportsEmerald
-                                              : PitchTheme.slateHeading,
-                                        ),
-                                      ),
-                                      if (item.teamAOvers != null)
-                                        Text(
-                                          item.teamAOvers!,
-                                          style: const TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: PitchTheme.slateSubdued,
-                                          ),
-                                        ),
-                                    ] else
-                                      const Text(
-                                        'Yet to bat',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: PitchTheme.slateSubdued,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // CENTER: Status badge
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: PitchTheme.hairlineBorder, width: 0.9),
-                            ),
-                            child: const Icon(
-                              Icons.sports_cricket,
-                              size: 18,
-                              color: PitchTheme.sportsEmerald,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          if (item.isLive)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: PitchTheme.liveRedBg,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: PitchTheme.liveRed.withValues(alpha: 0.3),
-                                  width: 0.8,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  RepaintBoundary(
-                                    child: AnimatedBuilder(
-                                      animation: _pulseAnimation,
-                                      builder: (context, _) => Container(
-                                        width: 5,
-                                        height: 5,
-                                        decoration: BoxDecoration(
-                                          color: PitchTheme.liveRed.withValues(alpha: _pulseAnimation.value),
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Text(
-                                    'LIVE',
-                                    style: TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: PitchTheme.liveRed,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          else
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: PitchTheme.surfaceContainerLow,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Text(
-                                'FT',
-                                style: TextStyle(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: PitchTheme.slateSubdued,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-
-                    // RIGHT: Team B
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      item.teamBCode,
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: item.isTeamBBatting ? FontWeight.w900 : FontWeight.w700,
-                                        color: PitchTheme.slateHeading,
-                                      ),
-                                    ),
-                                    if (item.teamBRuns != null) ...[
-                                      Text(
-                                        item.teamBRuns!,
-                                        style: TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w900,
-                                          color: item.isTeamBBatting
-                                              ? PitchTheme.sportsEmerald
-                                              : PitchTheme.slateHeading,
-                                        ),
-                                        textAlign: TextAlign.end,
-                                      ),
-                                      if (item.teamBOvers != null)
-                                        Text(
-                                          item.teamBOvers!,
-                                          style: const TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: PitchTheme.slateSubdued,
-                                          ),
-                                          textAlign: TextAlign.end,
-                                        ),
-                                    ] else
-                                      const Text(
-                                        'Yet to bat',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: PitchTheme.slateSubdued,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        textAlign: TextAlign.end,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              PresetTeamLogoBadge(
-                                logoKey: item.teamBLogo,
-                                teamName: item.teamBName,
-                                size: 36,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // ── Footer: equation / result ──
-              Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: PitchTheme.hairlineBorder, width: 0.9)),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Text(
-                  footerText,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: item.isLive ? PitchTheme.slateHeading : PitchTheme.slateSubdued,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
