@@ -116,6 +116,10 @@ class CpanelSyncService {
             ...m.toJson(),
             'teamAName': store.teamById(m.teamAId)?.name ?? 'Team A',
             'teamBName': store.teamById(m.teamBId)?.name ?? 'Team B',
+            'teamALogo': store.teamById(m.teamAId)?.logo ?? '',
+            'teamBLogo': store.teamById(m.teamBId)?.logo ?? '',
+            'teamACode': store.teamById(m.teamAId)?.shortCode ?? '',
+            'teamBCode': store.teamById(m.teamBId)?.shortCode ?? '',
             'updatedAtEpoch': m.updatedAtEpoch > 0 ? m.updatedAtEpoch : nowEpoch,
           },
       ];

@@ -206,6 +206,10 @@ class _HomeScreenState extends State<HomeScreen>
       if (x.id != y.id ||
           x.status != y.status ||
           x.resultText != y.resultText ||
+          x.teamALogo != y.teamALogo ||
+          x.teamBLogo != y.teamBLogo ||
+          x.teamACode != y.teamACode ||
+          x.teamBCode != y.teamBCode ||
           x.updatedAtEpoch != y.updatedAtEpoch ||
           x.innings.length != y.innings.length) {
         return false;
