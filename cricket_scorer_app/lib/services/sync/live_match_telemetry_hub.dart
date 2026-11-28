@@ -375,7 +375,13 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
               final tMap = Map<String, dynamic>.from(tItem);
               final tId = (tMap['id'] ?? '').toString();
               final tName = (tMap['name'] ?? '').toString();
+              final tLogo = (tMap['logo'] ?? tMap['logo_base64'] ?? '').toString();
+              final tCode = (tMap['shortCode'] ?? tMap['short_name'] ?? '').toString();
               final existingTeam = _store!.teamById(tId);
+              if (existingTeam != null) {
+                if (tLogo.isNotEmpty) existingTeam.logo = tLogo;
+                if (tCode.isNotEmpty) existingTeam.shortCode = tCode;
+              }
               final squad = <Player>[];
               if (tMap['players'] is List) {
                 for (final pItem in (tMap['players'] as List)) {
@@ -390,6 +396,7 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
                       role: (pMap['role'] ?? 'Batter').toString(),
                       battingStyle: (pMap['battingStyle'] ?? 'Right-hand').toString(),
                       bowlingStyle: (pMap['bowlingStyle'] ?? 'None').toString(),
+                      photoBase64: (pMap['photoBase64'] ?? pMap['photo_base64'] ?? '').toString(),
                       userCode: (pMap['userCode'] ?? '').toString(),
                       isVerified: pMap['isVerified'] == true,
                     );
@@ -405,6 +412,8 @@ class LiveMatchTelemetryHub extends ChangeNotifier {
                   id: tId,
                   name: tName,
                   players: squad,
+                  logo: tLogo,
+                  shortCode: tCode,
                 ));
               }
             }

@@ -51,9 +51,9 @@ Future<PresetTeamLogo?> showTeamLogoPicker(
                       color: PitchTheme.sportsEmeraldLight,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
-                      '12 PRESETS',
-                      style: TextStyle(
+                    child: Text(
+                      '${TeamPresetCatalog.presets.length} PRESETS',
+                      style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         color: PitchTheme.sportsEmerald,
@@ -72,14 +72,14 @@ Future<PresetTeamLogo?> showTeamLogoPicker(
               ),
               const SizedBox(height: 18),
               SizedBox(
-                height: 340,
+                height: (MediaQuery.sizeOf(ctx).height * 0.5).clamp(280.0, 440.0),
                 child: GridView.builder(
                   physics: const BouncingScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    childAspectRatio: 0.95,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
+                    crossAxisCount: 4,
+                    childAspectRatio: 0.78,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
                   ),
                   itemCount: TeamPresetCatalog.presets.length,
                   itemBuilder: (context, idx) {

@@ -53,6 +53,10 @@ class RemoteMatchSummary {
   final String teamBId;
   final String teamAName;
   final String teamBName;
+  final String teamALogo;
+  final String teamBLogo;
+  final String teamACode;
+  final String teamBCode;
   final String matchTitle;
   final int oversLimit;
   final int ballsPerOver;
@@ -75,6 +79,10 @@ class RemoteMatchSummary {
     this.teamBId = '',
     this.teamAName = 'Team A',
     this.teamBName = 'Team B',
+    this.teamALogo = '',
+    this.teamBLogo = '',
+    this.teamACode = '',
+    this.teamBCode = '',
     this.matchTitle = '',
     this.oversLimit = 20,
     this.ballsPerOver = 6,
@@ -110,6 +118,10 @@ class RemoteMatchSummary {
       teamBId: (j['team_b_id'] ?? '').toString(),
       teamAName: (j['team_a_name'] ?? 'Team A').toString(),
       teamBName: (j['team_b_name'] ?? 'Team B').toString(),
+      teamALogo: (j['team_a_logo'] ?? '').toString(),
+      teamBLogo: (j['team_b_logo'] ?? '').toString(),
+      teamACode: (j['team_a_code'] ?? '').toString(),
+      teamBCode: (j['team_b_code'] ?? '').toString(),
       matchTitle: (j['match_title'] ?? '').toString(),
       oversLimit: (j['overs_limit'] as num?)?.toInt() ?? 20,
       ballsPerOver: (j['balls_per_over'] as num?)?.toInt() ?? 6,
@@ -137,6 +149,10 @@ class RemoteMatchSummary {
         'team_b_id': teamBId,
         'team_a_name': teamAName,
         'team_b_name': teamBName,
+        'team_a_logo': teamALogo,
+        'team_b_logo': teamBLogo,
+        'team_a_code': teamACode,
+        'team_b_code': teamBCode,
         'match_title': matchTitle,
         'overs_limit': oversLimit,
         'balls_per_over': ballsPerOver,

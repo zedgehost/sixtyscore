@@ -421,29 +421,11 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                               horizontal: 8,
                               vertical: 4,
                             ),
-                            leading: Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? PitchTheme.primaryContainer
-                                    : PitchTheme.surfaceContainerLow,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  t.name.isNotEmpty
-                                      ? t.name[0].toUpperCase()
-                                      : 'T',
-                                  style: TextStyle(
-                                    color: isSelected
-                                        ? PitchTheme.tertiaryFixed
-                                        : PitchTheme.onSurface,
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
+                            leading: PresetTeamLogoBadge(
+                              logoKey: t.logo,
+                              teamName: t.name,
+                              size: 42,
+                              borderRadius: BorderRadius.circular(21),
                             ),
                             title: Text(
                               t.name,
@@ -1491,7 +1473,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
           ),
           const SizedBox(height: 8),
 
-          // 80x80 Circle: Dotted border with + OR Solid with initials
+          // 80x80 Logo: Dotted border with + OR Team Logo / Crest
           SizedBox(
             width: 80,
             height: 80,
@@ -1504,35 +1486,28 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                       dashWidth: 5,
                       dashSpace: 4,
                     ),
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: hasSelected
-                      ? PitchTheme.primaryContainer
-                      : PitchTheme.surfaceContainerLow.withValues(alpha: 0.4),
-                  border: hasSelected
-                      ? Border.all(color: PitchTheme.secondary, width: 2)
-                      : null,
-                ),
-                child: Center(
-                  child: hasSelected
-                      ? Text(
-                          team.name.isNotEmpty
-                              ? team.name[0].toUpperCase()
-                              : 'T',
-                          style: const TextStyle(
-                            color: PitchTheme.tertiaryFixed,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        )
-                      : const Icon(
+              child: hasSelected
+                  ? Center(
+                      child: PresetTeamLogoBadge(
+                        logoKey: team.logo,
+                        teamName: team.name,
+                        size: 76,
+                        borderRadius: BorderRadius.circular(38),
+                      ),
+                    )
+                  : Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: PitchTheme.surfaceContainerLow.withValues(alpha: 0.4),
+                      ),
+                      child: const Center(
+                        child: Icon(
                           Icons.add,
                           size: 28,
                           color: PitchTheme.outline,
                         ),
-                ),
-              ),
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 10),

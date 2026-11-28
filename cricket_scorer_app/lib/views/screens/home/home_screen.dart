@@ -2147,13 +2147,21 @@ class _HomeScreenState extends State<HomeScreen>
         !AuthService().isRestrictedGuest &&
         freshM.canUserScore(store.effectiveUserId, userCode: store.effectiveUserCode);
 
-    // Compute team logos and codes from local store
+    // Compute team logos and codes from local store (fallback to remote summary)
     final tA = store.teamById(teamAId);
     final tB = store.teamById(teamBId);
-    final logoA = tA?.logo ?? '';
-    final logoB = tB?.logo ?? '';
-    final codeA = tA?.displayCode ?? (tAName.length >= 2 ? tAName.substring(0, 2).toUpperCase() : tAName.toUpperCase());
-    final codeB = tB?.displayCode ?? (tBName.length >= 2 ? tBName.substring(0, 2).toUpperCase() : tBName.toUpperCase());
+    final logoA = (tA != null && tA.logo.isNotEmpty) ? tA.logo : (rm?.teamALogo ?? '');
+    final logoB = (tB != null && tB.logo.isNotEmpty) ? tB.logo : (rm?.teamBLogo ?? '');
+    final codeA = (tA != null && tA.shortCode.isNotEmpty)
+        ? tA.shortCode
+        : ((rm?.teamACode ?? '').isNotEmpty
+            ? rm!.teamACode
+            : (tA?.displayCode ?? (tAName.length >= 2 ? tAName.substring(0, 2).toUpperCase() : tAName.toUpperCase())));
+    final codeB = (tB != null && tB.shortCode.isNotEmpty)
+        ? tB.shortCode
+        : ((rm?.teamBCode ?? '').isNotEmpty
+            ? rm!.teamBCode
+            : (tB?.displayCode ?? (tBName.length >= 2 ? tBName.substring(0, 2).toUpperCase() : tBName.toUpperCase())));
 
     // Compute RRR if second innings running
     double rrr = 0.0;
